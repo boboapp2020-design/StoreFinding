@@ -1,0 +1,11 @@
+# ความลับ — ห้ามเผยแพร่ (มี Write Token) วางไว้ใน Google Apps Script เท่านั้น
+Code.gs
+
+# ข้อมูลต้นฉบับ / ไฟล์ใหญ่ (ไม่ต้องขึ้นเว็บ)
+database/
+Pic/
+
+# เบ็ดเตล็ด
+Thumbs.db
+.DS_Store
+*.tmp

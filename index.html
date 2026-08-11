@@ -260,7 +260,9 @@
 <div id="chat"></div>
 
 <footer>
-  <input id="q" type="text" placeholder="พิมพ์ชื่อสินค้า เช่น สายไฟ, ปากกา..." autocomplete="off" />
+  <input id="q" type="text" placeholder="พิมพ์ชื่อสินค้า เช่น สายไฟ, ปากกา..."
+         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+         name="q_search_nofill" data-lpignore="true" data-1p-ignore data-form-type="other" />
   <button id="send" title="ส่ง">
     <svg viewBox="0 0 24 24"><path fill="#fff" d="M21.9 3.06 2.7 10.62c-.94.37-.9 1.72.06 2.03l4.98 1.6 1.94 5.98c.3.9 1.46 1.1 2.03.32l2.53-2.42 4.7 3.44c.63.46 1.53.12 1.7-.65L23.02 4.2c.2-.9-.68-1.5-1.12-1.14z"/></svg>
   </button>

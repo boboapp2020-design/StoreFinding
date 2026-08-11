@@ -315,6 +315,19 @@
       <div class="import-log" id="importLog"></div>
     </div>
 
+    <div class="panel">
+      <h4>🔑 เปลี่ยนรหัส PIN ผู้ดูแล</h4>
+      <div class="hint">ตั้งรหัส PIN 4 หลักสำหรับเข้าโหมดผู้ดูแล (ค่าเริ่มต้น 1234) — บันทึกไว้ในเครื่องนี้</div>
+      <input id="newPin" type="password" inputmode="numeric" maxlength="4" placeholder="PIN ใหม่ (4 หลัก)" autocomplete="off"
+             style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;letter-spacing:8px;text-align:center;outline:none;font-family:monospace" />
+      <input id="newPin2" type="password" inputmode="numeric" maxlength="4" placeholder="ยืนยัน PIN ใหม่" autocomplete="off"
+             style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;letter-spacing:8px;text-align:center;outline:none;font-family:monospace;margin-top:8px" />
+      <div class="act-btns" style="margin-top:10px">
+        <button class="btn btn-primary" id="savePin">💾 บันทึก PIN ใหม่</button>
+      </div>
+      <div id="pinMsg" style="font-size:12.5px;margin-top:10px;line-height:1.5;font-weight:600;min-height:16px"></div>
+    </div>
+
   </div>
 </div>
 
@@ -332,7 +345,8 @@
 /* ไม่มีข้อมูลตัวอย่างในเครื่อง — แอปอิงข้อมูลจริงจาก Google Sheet (database) ทั้งหมด */
 const DEFAULT_DB = [];
 
-const ADMIN_PIN = "1234";
+const PIN_KEY = "admin_pin";
+let ADMIN_PIN = localStorage.getItem(PIN_KEY) || "1234";   // ค่าเริ่มต้น 1234 · เปลี่ยนได้ในโหมดผู้ดูแล
 const STORE_KEY = "warehouse_db_v1";
 
 /* โหลด/บันทึกข้อมูล (localStorage เพื่อให้ข้อมูลอยู่ถาวร) */
@@ -653,8 +667,25 @@ document.getElementById('admBack').addEventListener('click', ()=> adminPanel.cla
 let pendingRows = null, pendingName = '';
 function openAdmin(){
   resetUploadUI();
+  document.getElementById('newPin').value = '';
+  document.getElementById('newPin2').value = '';
+  document.getElementById('pinMsg').textContent = '';
   adminPanel.classList.add('show');
 }
+/* เปลี่ยนรหัส PIN (เก็บในเครื่อง) */
+document.getElementById('savePin').addEventListener('click', ()=>{
+  const a = document.getElementById('newPin').value.trim();
+  const b = document.getElementById('newPin2').value.trim();
+  const msg = document.getElementById('pinMsg');
+  if(!/^\d{4}$/.test(a)){ msg.style.color = '#dc2626'; msg.textContent = '⚠️ PIN ต้องเป็นตัวเลข 4 หลัก'; return; }
+  if(a !== b){ msg.style.color = '#dc2626'; msg.textContent = '⚠️ ยืนยัน PIN ไม่ตรงกัน ลองใหม่'; return; }
+  ADMIN_PIN = a;
+  localStorage.setItem(PIN_KEY, a);
+  document.getElementById('newPin').value = '';
+  document.getElementById('newPin2').value = '';
+  msg.style.color = '#15803d';
+  msg.textContent = '✅ เปลี่ยน PIN เรียบร้อยแล้ว — ครั้งต่อไปเข้าโหมดผู้ดูแลด้วย PIN ใหม่';
+});
 function resetUploadUI(){
   pendingRows = null; pendingName = '';
   document.getElementById('uploadConfirm').style.display = 'none';

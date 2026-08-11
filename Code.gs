@@ -77,12 +77,21 @@ function buildMap_(headerRow) {
   return map;
 }
 
-/* ★ รันฟังก์ชันนี้จาก Editor 1 ครั้ง เพื่ออนุญาตสิทธิ์ "เชื่อมต่ออินเทอร์เน็ต" (UrlFetchApp)
- *   แล้วดูผลลัพธ์ที่ View → Logs — ถ้าได้คำอังกฤษกลับมา = AI พร้อมใช้ */
+/* ★ รันฟังก์ชันนี้จาก Editor 1 ครั้ง → Google จะเด้งหน้าขออนุญาต "เชื่อมต่ออินเทอร์เน็ต"
+ *   (เรียก UrlFetchApp ตรง ๆ ไม่ครอบ try/catch จึงเด้งหน้าอนุญาตจริง)
+ *   หลังกด Allow แล้ว ดูผลที่ Execution log — ควรได้ HTTP 200 + คำแปลอังกฤษ */
 function testAI() {
-  var r = aiInterpret_('มีดโกน');
-  Logger.log('AI translate result: ' + JSON.stringify(r));
-  return r;
+  var pr = PropertiesService.getScriptProperties();
+  var key = pr.getProperty('AI_API_KEY') || pr.getProperty('GROQ_API_KEY');
+  var url = pr.getProperty('AI_API_URL') || 'https://api.groq.com/openai/v1/chat/completions';
+  var model = pr.getProperty('AI_MODEL') || 'llama-3.1-8b-instant';
+  var res = UrlFetchApp.fetch(url, {
+    method: 'post', contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + key },
+    payload: JSON.stringify({ model: model, temperature: 0, max_tokens: 40, messages: [{ role: 'user', content: 'reply with one english word: knife' }] }),
+    muteHttpExceptions: true
+  });
+  Logger.log('HTTP ' + res.getResponseCode() + '  |  ' + res.getContentText());
 }
 
 /* ---------- อ่าน + รวมข้อมูล (dedupe by Material, รวม stock หลายที่เก็บ) ---------- */

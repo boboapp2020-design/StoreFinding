@@ -128,6 +128,8 @@ function readCatalog_() {
     var code = col(row, map.code);
     if (!code) continue;
     if (isExcluded_(code, col(row, map.name))) continue;   // ตัดรหัสขึ้นต้นด้วย N (เว้นข้อยกเว้น)
+    // ข้ามแถวที่ "Descr. of Storage Loc." มีคำว่า DSV
+    if (map.slocName != null && String(row[map.slocName]).toUpperCase().indexOf('DSV') !== -1) continue;
     var qty = map.qty == null ? 0 : (parseFloat(String(row[map.qty]).replace(/[, ]/g, '')) || 0);
 
     var it = byCode[code];

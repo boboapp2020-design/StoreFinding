@@ -314,6 +314,7 @@ function upsert_(items, mode) {
     }
   });
 
+  if (map.code != null) sh.getRange(1, map.code + 1, values.length, 1).setNumberFormat('@');   // คอลัมน์รหัสเป็น Text เสมอ
   sh.getRange(1, 1, values.length, width).setValues(values);
   return { ok: true, added: added, updated: updated, count: values.length - 1 };
 }
@@ -327,8 +328,10 @@ function replaceAll_(items) {
   items.forEach(function (raw) {
     var it = mapIncoming_(raw);
     if (!it.code) return;
-    rows.push([it.code, it.name || '', it.group || '', it.unit || '', it.qty || 0, it.sloc || '', it.slocName || '', it.plant || '', it.plantName || '']);
+    rows.push([String(it.code), it.name || '', it.group || '', it.unit || '', it.qty || 0, it.sloc || '', it.slocName || '', it.plant || '', it.plantName || '']);
   });
+  // บังคับคอลัมน์รหัส (A) เป็น Text ก่อนเขียน → เลขยาวไม่ถูกย่อเป็น 1.01E+15 และไม่เสียหลัก
+  sh.getRange(1, 1, Math.max(rows.length, 2), 1).setNumberFormat('@');
   sh.getRange(1, 1, rows.length, HEAD.length).setValues(rows);
   sh.setFrozenRows(1);
   return { ok: true, count: rows.length - 1 };
@@ -339,7 +342,30 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('📦 คลังพัสดุ')
     .addItem('ตรวจสอบคอลัมน์ที่ตรวจจับได้', 'checkColumns')
     .addItem('นับจำนวนรายการ (unique Material)', 'countItems')
+    .addItem('ซ่อมรหัสให้แสดงเลขเต็ม (แก้ 1.01E+15)', 'fixCodeColumn')
     .addToUi();
+}
+
+/* ซ่อมคอลัมน์รหัส: แปลงตัวเลขที่ถูกย่อ (1.01E+15) กลับเป็นข้อความเลขเต็มทุกหลัก */
+function fixCodeColumn() {
+  var sh = dataSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) { SpreadsheetApp.getUi().alert('ไม่มีข้อมูล'); return; }
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var map = buildMap_(headers);
+  if (map.code == null) { SpreadsheetApp.getUi().alert('ไม่พบคอลัมน์ Material'); return; }
+  var colIdx = map.code + 1;
+  var rng = sh.getRange(2, colIdx, last - 1, 1);
+  var vals = rng.getValues();
+  var fixed = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var v = vals[i][0];
+    if (typeof v === 'number') { vals[i][0] = v.toFixed(0); fixed++; }   // เลข → ข้อความเลขเต็ม ไม่มี E+
+    else vals[i][0] = String(v);
+  }
+  sh.getRange(1, colIdx, last, 1).setNumberFormat('@');   // ตั้งคอลัมน์เป็น Text ถาวร
+  rng.setValues(vals);
+  SpreadsheetApp.getUi().alert('ซ่อมเรียบร้อย ✅\nแปลงรหัสที่เป็นตัวเลข ' + fixed + ' แถว ให้เป็นข้อความเลขเต็มแล้ว');
 }
 function checkColumns() {
   var sh = dataSheet_();

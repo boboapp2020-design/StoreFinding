@@ -58,6 +58,17 @@ var REQUIRED = ['code', 'name'];   // ต้องมี ไม่งั้น�
 
 /* ---------- utils ---------- */
 function norm_(s) { return String(s == null ? '' : s).toLowerCase().replace(/[\s\._\-\/()]/g, '').trim(); }
+/* ตัดวรรณยุกต์/ไม้ไต่คู้/ทัณฑฆาต ของไทย(U+0E47-4C) และลาว(U+0EC8-CD) เพื่อจับคำพิมพ์ผิดได้ทน (นอต=น็อต, ปั้ม=ปั๊ม) */
+function stripTones_(s) {
+  s = String(s); var out = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if ((c >= 0x0E47 && c <= 0x0E4C) || (c >= 0x0EC8 && c <= 0x0ECD)) continue; // วรรณยุกต์/ไม้ไต่คู้/ทัณฑฆาต ไทย+ลาว
+    out += s.charAt(i);
+  }
+  return out;
+}
+function normLoose_(s) { return stripTones_(norm_(s)); }
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 function dataSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -218,13 +229,19 @@ var SYN_GROUPS = [
 
 /* ขยายคำค้น → array ของคำ (normalize แล้ว) รวมคำพ้องข้ามภาษา */
 function expandQuery_(qRaw) {
-  var nq = norm_(qRaw);
+  var nq = norm_(qRaw), nql = normLoose_(qRaw);
   var set = {}; set[nq] = true;
   for (var g = 0; g < SYN_GROUPS.length; g++) {
     var grp = SYN_GROUPS[g], hit = false;
     for (var t = 0; t < grp.length; t++) {
       var nt = norm_(grp[t]); if (!nt) continue;
       if (nt === nq || (nq.length >= 2 && (nt.indexOf(nq) !== -1 || nq.indexOf(nt) !== -1))) { hit = true; break; }
+      // เดาคำพิมพ์ผิดของคำในพจนานุกรม (ไม่สนวรรณยุกต์) เช่น "ปากา"→ปากกา, "นอต"→น็อต
+      var ntl = stripTones_(nt);
+      if (nql.length >= 3 && Math.abs(ntl.length - nql.length) <= 2) {
+        var sim = 1 - lev_(nql, ntl) / Math.max(nql.length, ntl.length);
+        if (sim >= 0.72) { hit = true; break; }
+      }
     }
     if (hit) for (var k = 0; k < grp.length; k++) { var v = norm_(grp[k]); if (v) set[v] = true; }
   }
@@ -252,14 +269,15 @@ function scoreExact_(cat, variants) {
 
 /* เดาคำพิมพ์ผิด (fuzzy) กับคำเดียว */
 function scoreFuzzy_(cat, q) {
-  var best = [], qlen = q.length;
+  var ql = stripTones_(q), qlen = ql.length;
+  var best = [];
   for (var i = 0; i < cat.length; i++) {
     var it = cat[i], toks = it._tk || [], localBest = 0;
     for (var ti = 0; ti < toks.length; ti++) {
-      var tk = toks[ti]; if (!tk) continue;
+      var tk = stripTones_(toks[ti]); if (!tk) continue;
       var cand = (tk.length > qlen + 1) ? tk.substring(0, qlen) : tk;
       if (Math.abs(cand.length - qlen) > 3) continue;
-      var sim = 1 - lev_(q, cand) / Math.max(qlen, cand.length);
+      var sim = 1 - lev_(ql, cand) / Math.max(qlen, cand.length);
       if (sim > localBest) localBest = sim;
     }
     if (localBest >= 0.6) best.push([localBest, it]);

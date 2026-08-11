@@ -286,7 +286,10 @@ function expandQuery_(qRaw) {
     var grp = SYN_GROUPS[g], hit = false;
     for (var t = 0; t < grp.length; t++) {
       var nt = norm_(grp[t]); if (!nt) continue;
-      if (nt === nq || (nq.length >= 2 && (nt.indexOf(nq) !== -1 || nq.indexOf(nt) !== -1))) { hit = true; break; }
+      if (nt === nq) { hit = true; break; }
+      // เป็นส่วนหนึ่งของกัน แต่ความยาวต่างกันไม่เกิน 3 (กัน "เบรกเกอร์" ไปจับ "เบรก")
+      if (nq.length >= 3 && Math.abs(nt.length - nq.length) <= 3 &&
+          (nt.indexOf(nq) !== -1 || nq.indexOf(nt) !== -1)) { hit = true; break; }
       // เดาคำพิมพ์ผิดของคำในพจนานุกรม (ไม่สนวรรณยุกต์) เช่น "ปากา"→ปากกา, "นอต"→น็อต
       var ntl = stripTones_(nt);
       if (nql.length >= 3 && Math.abs(ntl.length - nql.length) <= 2) {
@@ -313,10 +316,9 @@ function scoreExact_(cat, variants) {
         for (var t = 0; t < toks.length; t++) {                // เทียบระดับคำ (แม่นกว่า substring กลางคำ)
           var tk = toks[t];
           if (tk === q) { if (s < 92) s = 92; }                // เป็นคำเต็มในชื่อ (เช่น "pen" ใน BALLPOINT PEN)
-          else if (tk.indexOf(q) === 0) { if (s < 84) s = 84; } // คำในชื่อขึ้นต้นด้วยคำค้น
-          else if (q.length >= 4 && tk.length >= 3 && q.indexOf(tk) === 0) { if (s < 80) s = 80; }
+          else if (q.length >= 3 && tk.indexOf(q) === 0) { if (s < 84) s = 84; } // คำในชื่อขึ้นต้นด้วยคำค้น
         }
-        if (s === 0 && q.length >= 5 && it._nn.indexOf(q) !== -1) s = 74; // คำยาวพอ ค่อยยอม substring กลางคำ
+        if (s === 0 && q.length >= 5 && it._nn.indexOf(q) !== -1) s = 74; // คำหลายพยางค์ ยอม substring (safety glasses ฯลฯ)
       }
       if (s > sc) sc = s;
     }

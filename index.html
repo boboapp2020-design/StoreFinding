@@ -578,9 +578,16 @@ function suggestPanel(headText, items){
 }
 /* ค้นหาผ่าน Google Sheet (Apps Script) */
 async function searchRemote(q){
-  const url = SHEET_API + (SHEET_API.includes('?')?'&':'?') + 'action=search&q=' + encodeURIComponent(q) + '&limit=8';
+  const url = SHEET_API + (SHEET_API.includes('?')?'&':'?') + 'action=search&q=' + encodeURIComponent(q) + '&limit=15';
   const res = await fetch(url);
   return await res.json();
+}
+/* แสดงผลหลายรายการเป็นการ์ดในบล็อกเดียว */
+function resultsPanel(items){
+  const row = document.createElement('div');
+  row.className = 'panel-row fade';
+  row.innerHTML = items.map(cardHTML).join('<div style="height:10px"></div>');
+  chat.appendChild(row); scrollDown();
 }
 function respond(query){
   const t = typing();
@@ -604,17 +611,19 @@ function renderResults(query, res){
     botRow(`ขออภัยครับ ไม่พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” 😕<br>ลองพิมพ์ชื่อ/รหัสให้สั้นลง หรือใช้คำอื่นดูครับ`, true);
     return;
   }
+  const cnt = res.count + (res.count>=15?'+':'');
   if(res.mode === 'ai'){
-    botRow(`🤖 ผมเข้าใจว่า “<b>${esc(query)}</b>” หมายถึง <b>${esc(res.ai||'')}</b><br>พบรายการนี้ครับ 👇`, true);
+    botRow(`🤖 ผมเข้าใจว่า “<b>${esc(query)}</b>” หมายถึง <b>${esc(res.ai||'')}</b> — พบ <b>${cnt}</b> รายการครับ 👇`, true);
   } else if(res.mode === 'fuzzy'){
-    botRow(`ไม่พบคำว่า “<b>${esc(query)}</b>” พอดีเป๊ะ ๆ ครับ 🤔<br>คุณหมายถึงรายการนี้หรือเปล่า?`, true);
+    botRow(`ไม่พบคำว่า “<b>${esc(query)}</b>” พอดี ๆ ครับ 🤔 คุณหมายถึงกลุ่มนี้ไหม (<b>${cnt}</b> รายการ) 👇`, true);
   } else {
-    const more = res.count>1 ? ` (พบ ${res.count}${res.count>=8?'+':''} รายการ)` : '';
-    botRow(`พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” แล้วครับ${more} 👇`, true);
+    botRow(`พบ <b>${cnt}</b> รายการที่ตรงกับ “<b>${esc(query)}</b>” ครับ 👇`, true);
   }
-  botRow(cardHTML(items[0]));
-  const others = items.slice(1,5);
-  if(others.length) suggestPanel('รายการอื่นที่เกี่ยวข้อง:', others);
+  const showN = Math.min(items.length, 6);
+  resultsPanel(items.slice(0, showN));
+  if(res.count > showN){
+    botRow(`…และอีก <b>${res.count - showN}${res.count>=15?'+':''}</b> รายการ — ถ้ายังไม่เจอที่ต้องการ ลองพิมพ์ให้เจาะจงขึ้นครับ`);
+  }
 }
 /* ค้นหาในข้อมูลตัวอย่าง (เมื่อยังไม่เชื่อมต่อ Sheet) */
 function renderLocal(query){

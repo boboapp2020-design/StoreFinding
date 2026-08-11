@@ -1,5 +1,5 @@
 /* Service Worker — ผู้ช่วยคลังพัสดุ (offline support) */
-const CACHE = 'warehouse-app-v15';
+const CACHE = 'warehouse-app-v16';
 const ASSETS = [
   './',
   './index.html',
@@ -26,17 +26,28 @@ self.addEventListener('activate', e => {
   );
 });
 
-/* cache-first: โหลดเร็ว + ใช้งานออฟไลน์ได้ */
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(hit => {
-      if (hit) return hit;
-      return fetch(e.request).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+  var req = e.request;
+  var isHTML = req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1;
+
+  if (isHTML) {
+    // network-first: เปิดแอปได้ตัวล่าสุดเสมอเมื่อออนไลน์ (ออฟไลน์ค่อยใช้ cache)
+    e.respondWith(
+      fetch(req).then(res => {
+        var copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
         return res;
-      }).catch(() => caches.match('./index.html'));
-    })
+      }).catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
+    );
+    return;
+  }
+  // ไฟล์อื่น (ไอคอน/สคริปต์) → cache-first เพื่อความเร็ว
+  e.respondWith(
+    caches.match(req).then(hit => hit || fetch(req).then(res => {
+      var copy = res.clone();
+      caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+      return res;
+    }))
   );
 });

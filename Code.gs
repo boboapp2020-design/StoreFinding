@@ -165,53 +165,54 @@ function lev_(a, b) {
 
 /* ---------- ค้นหา ---------- */
 /* ============ พจนานุกรมคำพ้อง ไทย/ลาว ↔ อังกฤษ (แก้/เพิ่มได้ตามต้องการ) ============ */
+/* แต่ละกลุ่มรวมคำที่ความหมายเดียวกัน: ไทย | ลาว | อังกฤษ */
 var SYN_GROUPS = [
-  ['ปากกา', 'ปากกาลูกลื่น', 'pen', 'ballpoint'],
-  ['ดินสอ', 'pencil'],
-  ['กระดาษ', 'paper'],
-  ['สายไฟ', 'สายเคเบิล', 'wire', 'cable'],
-  ['น็อต', 'นอต', 'สกรู', 'bolt', 'nut', 'screw'],
-  ['ถุงมือ', 'glove', 'gloves'],
-  ['หมวก', 'หมวกนิรภัย', 'helmet'],
-  ['หลอดไฟ', 'หลอด', 'bulb', 'lamp', 'led'],
-  ['เทป', 'tape'],
-  ['น้ำมัน', 'oil', 'lubricant'],
-  ['จารบี', 'grease'],
-  ['แบตเตอรี่', 'ถ่าน', 'battery'],
-  ['มอเตอร์', 'motor'],
-  ['ปั๊ม', 'ปั้ม', 'pump'],
-  ['ท่อ', 'pipe', 'tube'],
-  ['วาล์ว', 'ประตูน้ำ', 'valve'],
-  ['ลูกปืน', 'ตลับลูกปืน', 'bearing'],
-  ['สวิตช์', 'switch'],
-  ['เบรก', 'brake'],
-  ['กรอง', 'ไส้กรอง', 'filter'],
-  ['แหวน', 'washer'],
-  ['ประเก็น', 'ปะเก็น', 'gasket'],
-  ['ข้อต่อ', 'ข้องอ', 'elbow', 'joint', 'coupling', 'fitting'],
-  ['สายพาน', 'belt'],
-  ['โซ่', 'chain'],
-  ['พัดลม', 'fan'],
-  ['ฟิวส์', 'fuse'],
+  ['ปากกา', 'ปากกาลูกลื่น', 'ບິກ', 'ປາກກາ', 'pen', 'ballpoint'],
+  ['ดินสอ', 'ສໍ', 'pencil'],
+  ['กระดาษ', 'ເຈ້ຍ', 'paper'],
+  ['สายไฟ', 'สายเคเบิล', 'ສາຍໄຟ', 'wire', 'cable'],
+  ['น็อต', 'นอต', 'สกรู', 'ນັອດ', 'bolt', 'nut', 'screw'],
+  ['ถุงมือ', 'ຖົງມື', 'glove', 'gloves'],
+  ['หมวก', 'หมวกนิรภัย', 'ໝວກ', 'helmet'],
+  ['หลอดไฟ', 'หลอด', 'ຫລອດໄຟ', 'bulb', 'lamp', 'led'],
+  ['เทป', 'ເທບ', 'tape'],
+  ['น้ำมัน', 'ນ້ຳມັນ', 'oil', 'lubricant'],
+  ['จารบี', 'ຈາລະບີ', 'grease'],
+  ['แบตเตอรี่', 'ถ่าน', 'ถ่านไฟ', 'ຖ່ານ', 'ຖ່ານໄຟ', 'ໝໍ້ໄຟ', 'battery'],
+  ['มอเตอร์', 'ມໍເຕີ', 'motor'],
+  ['ปั๊ม', 'ปั้ม', 'ປໍ້າ', 'pump'],
+  ['ท่อ', 'ທໍ່', 'pipe', 'tube'],
+  ['วาล์ว', 'ประตูน้ำ', 'ວາລ໌', 'valve'],
+  ['ลูกปืน', 'ตลับลูกปืน', 'ໝາກປືນ', 'bearing'],
+  ['สวิตช์', 'ສະວິດ', 'switch'],
+  ['เบรก', 'ເບຣກ', 'brake'],
+  ['กรอง', 'ไส้กรอง', 'ໄສ້ກອງ', 'filter'],
+  ['แหวน', 'ແຫວນ', 'washer'],
+  ['ประเก็น', 'ปะเก็น', 'ปะกำ', 'gasket'],
+  ['ข้อต่อ', 'ข้องอ', 'ຂໍ້ຕໍ່', 'elbow', 'joint', 'coupling', 'fitting'],
+  ['สายพาน', 'ສາຍພານ', 'belt'],
+  ['โซ่', 'ໂສ້', 'chain'],
+  ['พัดลม', 'ພັດລົມ', 'fan'],
+  ['ฟิวส์', 'ຟິວ', 'fuse'],
   ['รีเลย์', 'relay'],
   ['เซนเซอร์', 'sensor'],
   ['เกจ', 'เกจวัด', 'gauge'],
-  ['ประแจ', 'wrench', 'spanner'],
-  ['ค้อน', 'hammer'],
-  ['ไขควง', 'screwdriver'],
-  ['คีม', 'plier', 'pliers'],
-  ['เลื่อย', 'saw'],
-  ['สว่าน', 'drill'],
-  ['ตะปู', 'nail'],
-  ['กาว', 'glue', 'adhesive'],
-  ['แปรง', 'brush'],
-  ['เชือก', 'rope'],
-  ['ยาง', 'tire', 'tyre', 'rubber'],
+  ['ประแจ', 'ປະແຈ', 'wrench', 'spanner'],
+  ['ค้อน', 'ຄ້ອນ', 'hammer'],
+  ['ไขควง', 'ໄຂຄວງ', 'screwdriver'],
+  ['คีม', 'ຄີມ', 'plier', 'pliers'],
+  ['เลื่อย', 'ເລື່ອຍ', 'saw'],
+  ['สว่าน', 'ສະຫວ່ານ', 'drill'],
+  ['ตะปู', 'ຕະປູ', 'nail'],
+  ['กาว', 'ກາວ', 'glue', 'adhesive'],
+  ['แปรง', 'ແປງ', 'brush'],
+  ['เชือก', 'ເຊືອກ', 'rope'],
+  ['ยาง', 'ຢາງ', 'tire', 'tyre', 'rubber'],
   ['ลูกสูบ', 'piston'],
   ['เพลา', 'shaft'],
-  ['เฟือง', 'gear'],
+  ['เฟือง', 'ເຟືອງ', 'gear'],
   ['หัวฉีด', 'nozzle', 'injector'],
-  ['ถัง', 'tank', 'drum'],
+  ['ถัง', 'ຖັງ', 'tank', 'drum'],
   ['ฝา', 'cover', 'cap', 'lid']
 ];
 
@@ -290,10 +291,11 @@ function aiInterpret_(qRaw) {
       messages: [
         { role: 'system', content:
           'You are a search assistant for a factory warehouse / spare-parts catalog (sugar mill). ' +
-          'Item names in the database are mostly ENGLISH technical terms (e.g. BALLPOINT PEN, BEARING, VALVE, ELBOW). ' +
-          'Users search in Thai, Lao, or English and may be vague. ' +
-          'Map the user query to the concise ENGLISH keyword(s) most likely to appear in the item name. ' +
-          'Reply with ONLY 1-5 comma-separated keywords, no explanation.' },
+          'Item names in the database are mostly ENGLISH technical terms (e.g. BALLPOINT PEN, BEARING, VALVE, GREASE, BATTERY). ' +
+          'The user query may be in THAI, LAO, or English, and may be vague or misspelled. ' +
+          'First understand the real MEANING of the item, then output the ENGLISH keyword(s) most likely to appear in the item name. ' +
+          'Lao examples: "ຈາລະບີ"=grease; "ຖ່ານໄຟ"=battery; "ຢາງ"=rubber,tire; "ນ້ຳມັນ"=oil; "ສາຍໄຟ"=wire; "ໝວກ"=helmet; "ຖົງມື"=glove; "ໄຂຄວງ"=screwdriver. ' +
+          'Reply with ONLY 1-5 comma-separated English keywords, no explanation.' },
         { role: 'user', content: String(qRaw) }
       ]
     };

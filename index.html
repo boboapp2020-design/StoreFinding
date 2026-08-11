@@ -160,12 +160,6 @@
     background: rgba(255,255,255,.86); border-top: 1px solid rgba(120,170,255,.28);
     display: flex; gap: 8px; align-items: center; backdrop-filter: blur(8px);
   }
-  .foot-ic {
-    width: 44px; height: 44px; border-radius: 50%; border: none; background: #eaf2ff; color: var(--pri);
-    display: grid; place-items: center; cursor: pointer; flex-shrink: 0; transition: .15s;
-  }
-  .foot-ic:active { transform: scale(.92); }
-  .foot-ic svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.7; }
   #q {
     flex: 1; border: 1.5px solid #dbe7ff; border-radius: 24px; padding: 12px 16px; font-size: 15px;
     outline: none; font-family: inherit; background: #eef4ff; transition: .15s;
@@ -369,7 +363,7 @@ function saveDB(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } 
 /* ================= เชื่อมต่อ Google Sheet ================= */
 const API_KEY = "sheet_api_url";
 /* URL ฐานข้อมูลจริง (Google Sheet + Apps Script) — ฝังไว้ให้เชื่อมต่ออัตโนมัติ */
-const DEFAULT_SHEET_API = "https://script.google.com/macros/s/AKfycbyR4BusKj2fOJpuM33Iw7bKRWyztGVC00Xwi8Za-jV6Pesg-OUHd7Z0l8XGKp_OpN0/exec";
+const DEFAULT_SHEET_API = "https://script.google.com/macros/s/AKfycbz8frSZtZ4QI1IUZYrreykuP0XjFYVDsJFO3g2N-UhlcbTM_0WioOVDEAySJFb24UJS/exec";
 let SHEET_API = (localStorage.getItem(API_KEY) || DEFAULT_SHEET_API).trim();
 
 /* Write Token — แอดมินกรอกครั้งเดียว เก็บในเครื่องแอดมินเอง (ไม่ฝังในโค้ดสาธารณะ) */

@@ -281,7 +281,6 @@
     <div class="splash-avatar"><img src="na.png" alt="ผู้ช่วยคลังพัสดุ" /></div>
     <div class="splash-title">ยินดีต้อนรับ 👋</div>
     <div class="splash-sub">ผู้ช่วยคลังพัสดุ<small>ค้นหารหัสพัสดุด้วยชื่อสินค้า — แค่พิมพ์ ผมช่วยหาให้เอง</small></div>
-    <button id="splashBtn" class="splash-btn">เริ่มใช้งาน →</button>
   </div>
 </div>
 
@@ -701,9 +700,7 @@ window.addEventListener('load', ()=>{ clearSearchBox(); setTimeout(clearSearchBo
 
 /* ================= หน้าต้อนรับ (Splash) ================= */
 const splash = document.getElementById('splash');
-function hideSplash(){ splash.classList.add('hide'); }
-document.getElementById('splashBtn').addEventListener('click', hideSplash);
-setTimeout(hideSplash, 6000);   // ถ้าไม่กด ปิดเองใน 6 วินาที
+setTimeout(()=> splash.classList.add('hide'), 3000);   // เข้าแอปอัตโนมัติหลัง 3 วินาที
 
 /* ================= โหมดผู้ดูแล (Admin) ================= */
 const pinOverlay = document.getElementById('pinOverlay');

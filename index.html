@@ -260,7 +260,10 @@
 <div id="chat"></div>
 
 <footer>
-  <input id="q" type="text" placeholder="พิมพ์ชื่อสินค้า เช่น สายไฟ, ปากกา..."
+  <!-- ช่องหลอก: ดูด autofill รหัสผ่านที่ Chrome บันทึกไว้ ไม่ให้มาลงช่องค้นหา -->
+  <input type="text" name="username" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+  <input type="password" name="password" autocomplete="current-password" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+  <input id="q" type="search" placeholder="พิมพ์ชื่อสินค้า เช่น สายไฟ, ปากกา..."
          readonly onfocus="this.removeAttribute('readonly')"
          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
          name="q_search_nofill" data-lpignore="true" data-1p-ignore data-form-type="other" />
@@ -274,7 +277,7 @@
   <div class="modal">
     <h3>🔒 โหมดผู้ดูแล</h3>
     <p>กรุณาใส่รหัส PIN 4 หลักเพื่อเข้าจัดการข้อมูลคลัง</p>
-    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="4" placeholder="••••" />
+    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="one-time-code" name="pin_otp" />
     <div class="pin-err" id="pinErr"></div>
     <div class="btn-row">
       <button class="btn btn-ghost" id="pinCancel">ยกเลิก</button>
@@ -321,11 +324,11 @@
       <div class="hint">ตั้งรหัส PIN 4 หลักสำหรับเข้าโหมดผู้ดูแล (ค่าเริ่มต้น 1234) เก็บไว้ในเครื่องนี้</div>
       <div class="pin-field">
         <label for="newPin">PIN ใหม่</label>
-        <input id="newPin" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" />
+        <input id="newPin" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="one-time-code" name="newpin_otp" />
       </div>
       <div class="pin-field">
         <label for="newPin2">ยืนยัน PIN ใหม่</label>
-        <input id="newPin2" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" />
+        <input id="newPin2" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="one-time-code" name="newpin2_otp" />
       </div>
       <button class="btn btn-primary" id="savePin" style="width:100%;margin-top:14px">บันทึก PIN ใหม่</button>
       <div id="pinMsg" style="font-size:12.5px;margin-top:10px;line-height:1.5;font-weight:600;min-height:16px"></div>

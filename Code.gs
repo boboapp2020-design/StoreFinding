@@ -360,9 +360,15 @@ function scoreFuzzy_(cat, q) {
 function aiInterpret_(qRaw) {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('AI_API_KEY') || props.getProperty('GROQ_API_KEY');
-  if (!key) return [];
+  if (!key) return [];   // ไม่มีคีย์ = ไม่เรียก API เลย (ใช้พจนานุกรม+เดาคำต่อได้)
+  // แคชผลแปล 6 ชม. — คำเดิมที่คนค้นซ้ำจะไม่เรียก API อีก (ประหยัดโควต้า)
+  var cache = CacheService.getScriptCache();
+  var ckey = 'ai:' + norm_(qRaw);
+  var cached = cache.get(ckey);
+  if (cached !== null) return cached ? cached.split('|') : [];
   var url = props.getProperty('AI_API_URL') || 'https://api.groq.com/openai/v1/chat/completions';
   var model = props.getProperty('AI_MODEL') || 'llama-3.1-8b-instant';
+  var out = [];
   try {
     var payload = {
       model: model,
@@ -385,8 +391,10 @@ function aiInterpret_(qRaw) {
     });
     var data = JSON.parse(res.getContentText());
     var text = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-    return text.split(/[,\n]/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 5);
-  } catch (e) { return []; }
+    out = text.split(/[,\n]/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 5);
+  } catch (e) { out = []; }
+  try { cache.put(ckey, out.join('|'), 21600); } catch (e) {}   // เก็บผล 6 ชม. (รวมผลว่าง กันเรียกซ้ำ)
+  return out;
 }
 
 /* ---------- ค้นหา: พจนานุกรม → เดาคำ → Groq ---------- */

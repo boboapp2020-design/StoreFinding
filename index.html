@@ -261,6 +261,7 @@
 
 <footer>
   <input id="q" type="text" placeholder="พิมพ์ชื่อสินค้า เช่น สายไฟ, ปากกา..."
+         readonly onfocus="this.removeAttribute('readonly')"
          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
          name="q_search_nofill" data-lpignore="true" data-1p-ignore data-form-type="other" />
   <button id="send" title="ส่ง">
@@ -366,7 +367,9 @@ function saveDB(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } 
 const API_KEY = "sheet_api_url";
 /* URL ฐานข้อมูลจริง (Google Sheet + Apps Script) — ฝังไว้ให้เชื่อมต่ออัตโนมัติ */
 const DEFAULT_SHEET_API = "https://script.google.com/macros/s/AKfycbz8frSZtZ4QI1IUZYrreykuP0XjFYVDsJFO3g2N-UhlcbTM_0WioOVDEAySJFb24UJS/exec";
-let SHEET_API = (localStorage.getItem(API_KEY) || DEFAULT_SHEET_API).trim();
+/* ใช้ URL ที่ฝังไว้เสมอ + ล้างค่าเก่าที่อาจค้างใน localStorage (กันแอปชี้ URL เก่า) */
+let SHEET_API = DEFAULT_SHEET_API;
+try { localStorage.removeItem(API_KEY); } catch(e){}
 
 /* Write Token — แอดมินกรอกครั้งเดียว เก็บในเครื่องแอดมินเอง (ไม่ฝังในโค้ดสาธารณะ) */
 const TOKEN_KEY = "write_token";
@@ -639,6 +642,9 @@ window.ask = ask;
 function submit(){ const v = input.value.trim(); if(!v) return; input.value=''; ask(v); }
 sendBtn.addEventListener('click', submit);
 input.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+/* กันเบราว์เซอร์/ตัวจำรหัส เติมค่า (เช่น admin) ในช่องค้นหา — ล้างตอนโหลดถ้ายังไม่ได้พิมพ์ */
+function clearSearchBox(){ if(document.activeElement !== input) input.value = ''; }
+window.addEventListener('load', ()=>{ clearSearchBox(); setTimeout(clearSearchBox, 200); setTimeout(clearSearchBox, 700); });
 
 /* ================= โหมดผู้ดูแล (Admin) ================= */
 const pinOverlay = document.getElementById('pinOverlay');

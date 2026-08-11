@@ -151,7 +151,7 @@ function readCatalog_() {
     var it = byCode[k];
     it._nn = norm_(it.name);
     it._nc = norm_(it.code);
-    it._tk = String(it.name).split(/\s+/).map(function (t) { return norm_(t); }).filter(Boolean);
+    it._tk = String(it.name).split(/[\s,;:\/()\-\.]+/).map(function (t) { return norm_(t); }).filter(Boolean);
     arr.push(it);
   });
   return { items: arr, map: map, headers: headers };
@@ -224,7 +224,58 @@ var SYN_GROUPS = [
   ['เฟือง', 'ເຟືອງ', 'gear'],
   ['หัวฉีด', 'nozzle', 'injector'],
   ['ถัง', 'ຖັງ', 'tank', 'drum'],
-  ['ฝา', 'cover', 'cap', 'lid']
+  ['ฝา', 'cover', 'cap', 'lid'],
+  // ---- เพิ่มเติม: ของใช้ในโรงงาน / ออฟฟิศ / เซฟตี้ ----
+  ['ยางลบ', 'eraser'],
+  ['ไม้บรรทัด', 'ruler'],
+  ['กรรไกร', 'scissors'],
+  ['ที่เย็บกระดาษ', 'แม็ก', 'stapler'],
+  ['ลวดเย็บ', 'staple'],
+  ['แฟ้ม', 'folder', 'file'],
+  ['ซองจดหมาย', 'envelope'],
+  ['หมึก', 'ink'],
+  ['ตลับหมึก', 'cartridge', 'toner'],
+  ['แว่นตานิรภัย', 'แว่นตา', 'goggles', 'safety glasses'],
+  ['รองเท้าเซฟตี้', 'รองเท้า', 'safety shoes', 'boots'],
+  ['หน้ากาก', 'mask', 'respirator'],
+  ['ที่อุดหู', 'ปลั๊กอุดหู', 'ear plug', 'earplug'],
+  ['เสื้อสะท้อนแสง', 'safety vest'],
+  ['สายยาง', 'hose'],
+  ['หน้าแปลน', 'flange'],
+  ['ซีล', 'seal'],
+  ['โอริง', 'oring', 'o-ring'],
+  ['ลูกลอย', 'float'],
+  ['โซลินอยด์', 'solenoid'],
+  ['คอนแทคเตอร์', 'contactor'],
+  ['เบรกเกอร์', 'breaker'],
+  ['คาปาซิเตอร์', 'คาปา', 'capacitor'],
+  ['สตาร์ทเตอร์', 'starter'],
+  ['เทอร์มินอล', 'terminal'],
+  ['ปลั๊กไฟ', 'ปลั๊ก', 'plug'],
+  ['เต้ารับ', 'socket', 'receptacle'],
+  ['ตะแกรง', 'screen', 'mesh'],
+  ['มู่เล่ย์', 'มูเล่', 'pulley'],
+  ['สปริง', 'spring'],
+  ['ลวด', 'wire'],
+  ['แผ่นเหล็ก', 'steel plate', 'sheet'],
+  ['กระบอกลม', 'ลูกสูบลม', 'air cylinder', 'pneumatic'],
+  ['เกจวัดแรงดัน', 'เกจวัด', 'pressure gauge'],
+  ['เทอร์โมมิเตอร์', 'thermometer'],
+  ['ปั๊มน้ำ', 'water pump'],
+  ['ใบพัด', 'impeller'],
+  ['ฮีตเตอร์', 'heater'],
+  ['ผ้าเบรก', 'brake pad', 'brake lining'],
+  ['ลูกหมาก', 'ball joint'],
+  ['ซีลกันน้ำมัน', 'oil seal'],
+  ['บูช', 'bush', 'bushing'],
+  ['ปลอก', 'sleeve'],
+  ['หมุด', 'rivet'],
+  ['กิ๊บ', 'clip'],
+  ['เข็มขัดรัดท่อ', 'แคลมป์', 'clamp'],
+  ['น้ำมันเครื่อง', 'engine oil'],
+  ['น้ำมันไฮดรอลิก', 'hydraulic oil'],
+  ['สายพานลำเลียง', 'conveyor belt'],
+  ['ตัวกรองอากาศ', 'ไส้กรองอากาศ', 'air filter']
 ];
 
 /* ขยายคำค้น → array ของคำ (normalize แล้ว) รวมคำพ้องข้ามภาษา */
@@ -252,13 +303,21 @@ function expandQuery_(qRaw) {
 function scoreExact_(cat, variants) {
   var hits = [];
   for (var i = 0; i < cat.length; i++) {
-    var it = cat[i], sc = 0;
+    var it = cat[i], toks = it._tk || [], sc = 0;
     for (var v = 0; v < variants.length; v++) {
       var q = variants[v]; if (!q) continue;
       var s = 0;
-      if (it._nc === q || it._nn === q) s = 100;
-      else if (it._nc.indexOf(q) !== -1) s = 93;
-      else if (it._nn.indexOf(q) !== -1) s = 85 - Math.min(20, Math.abs(it._nn.length - q.length));
+      if (it._nc === q || it._nn === q) s = 100;               // ตรงทั้งชื่อ/รหัส
+      else if (it._nc.indexOf(q) !== -1) s = 95;               // รหัสมีคำนี้
+      else {
+        for (var t = 0; t < toks.length; t++) {                // เทียบระดับคำ (แม่นกว่า substring กลางคำ)
+          var tk = toks[t];
+          if (tk === q) { if (s < 92) s = 92; }                // เป็นคำเต็มในชื่อ (เช่น "pen" ใน BALLPOINT PEN)
+          else if (tk.indexOf(q) === 0) { if (s < 84) s = 84; } // คำในชื่อขึ้นต้นด้วยคำค้น
+          else if (q.length >= 4 && tk.length >= 3 && q.indexOf(tk) === 0) { if (s < 80) s = 80; }
+        }
+        if (s === 0 && q.length >= 5 && it._nn.indexOf(q) !== -1) s = 74; // คำยาวพอ ค่อยยอม substring กลางคำ
+      }
       if (s > sc) sc = s;
     }
     if (sc > 0) hits.push([sc, it]);

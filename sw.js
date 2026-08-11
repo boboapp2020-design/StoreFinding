@@ -1,5 +1,5 @@
 /* Service Worker — ผู้ช่วยคลังพัสดุ (offline support) */
-const CACHE = 'warehouse-app-v13';
+const CACHE = 'warehouse-app-v14';
 const ASSETS = [
   './',
   './index.html',

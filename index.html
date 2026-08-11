@@ -1,0 +1,730 @@
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0f766e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="คลังพัสดุ" />
+<title>ผู้ช่วยคลังพัสดุ</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<!-- SheetJS สำหรับอ่านไฟล์ Excel (.xlsx) — รวมไว้ในตัว ใช้งานออฟไลน์ได้ -->
+<script src="xlsx.full.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --teal: #0f766e;
+    --teal-d: #115e59;
+    --teal-l: #14b8a6;
+    --bg: #f1f5f9;
+    --bubble-bot: #ffffff;
+    --bubble-user: #0f766e;
+    --text: #0f172a;
+    --muted: #64748b;
+    --card: #ecfdf5;
+    --card-border: #99f6e4;
+  }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Sarabun", "Noto Sans Thai", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overscroll-behavior: none;
+  }
+  body { display: flex; flex-direction: column; max-width: 520px; margin: 0 auto; height: 100dvh; background: var(--bg); position: relative; }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, var(--teal) 0%, var(--teal-d) 100%);
+    color: #fff;
+    padding: 14px 16px;
+    padding-top: calc(14px + env(safe-area-inset-top));
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 2px 12px rgba(15,118,110,.25);
+    z-index: 10;
+  }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,.18);
+    display: grid; place-items: center; font-size: 24px;
+    border: 2px solid rgba(255,255,255,.35);
+    flex-shrink: 0;
+  }
+  .h-title { font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .h-sub { font-size: 12px; opacity: .85; display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 rgba(74,222,128,.7); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(74,222,128,.6)} 70%{box-shadow:0 0 0 6px rgba(74,222,128,0)} 100%{box-shadow:0 0 0 0 rgba(74,222,128,0)} }
+  .gear {
+    margin-left: auto; width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,.15); border: none; color: #fff; font-size: 20px;
+    cursor: pointer; display: grid; place-items: center; flex-shrink: 0; transition: .15s;
+  }
+  .gear:active { transform: scale(.9) rotate(40deg); }
+
+  /* Chat area */
+  #chat {
+    flex: 1; overflow-y: auto; padding: 16px 12px 8px;
+    display: flex; flex-direction: column; gap: 12px;
+    scroll-behavior: smooth;
+  }
+  .row { display: flex; gap: 8px; align-items: flex-end; max-width: 88%; }
+  .row.bot { align-self: flex-start; }
+  .row.user { align-self: flex-end; flex-direction: row-reverse; }
+  .mini-av {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 16px;
+    background: var(--teal); color: #fff; margin-bottom: 2px;
+  }
+  .bubble {
+    padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06); word-break: break-word;
+  }
+  .bot .bubble { background: var(--bubble-bot); border-bottom-left-radius: 5px; }
+  .user .bubble { background: var(--bubble-user); color: #fff; border-bottom-right-radius: 5px; }
+
+  /* Result card */
+  .card {
+    background: var(--card); border: 1.5px solid var(--card-border);
+    border-radius: 14px; padding: 12px 14px; margin-top: 4px;
+  }
+  .card .name { font-weight: 700; font-size: 15px; margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
+  .code-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .code {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 17px; font-weight: 800; letter-spacing: .5px;
+    background: var(--teal); color: #fff; padding: 4px 12px; border-radius: 8px;
+  }
+  .copy-btn {
+    border: none; background: #fff; color: var(--teal); font-weight: 700;
+    border: 1.5px solid var(--teal); border-radius: 8px; padding: 5px 10px;
+    font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .copy-btn:active { transform: scale(.94); }
+  .meta { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .stock-pill { display:inline-block; padding:1px 8px; border-radius:20px; font-size:11.5px; font-weight:700; }
+  .in { background:#dcfce7; color:#15803d; } .low { background:#fef9c3; color:#a16207; } .out { background:#fee2e2; color:#b91c1c; }
+
+  /* Suggestion chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .chip {
+    background: #fff; border: 1.5px solid #cbd5e1; color: var(--teal-d);
+    padding: 7px 13px; border-radius: 20px; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; transition: .15s;
+  }
+  .chip:active { background: var(--teal); color: #fff; border-color: var(--teal); transform: scale(.96); }
+
+  /* Typing indicator */
+  .typing .bubble { padding: 13px 16px; }
+  .typing span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; margin: 0 2px; animation: blink 1.2s infinite; }
+  .typing span:nth-child(2){ animation-delay:.2s } .typing span:nth-child(3){ animation-delay:.4s }
+  @keyframes blink { 0%,60%,100%{opacity:.3; transform:translateY(0)} 30%{opacity:1; transform:translateY(-3px)} }
+
+  /* Input bar */
+  footer {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: #fff; border-top: 1px solid #e2e8f0;
+    display: flex; gap: 8px; align-items: center;
+  }
+  #q {
+    flex: 1; border: 1.5px solid #cbd5e1; border-radius: 24px;
+    padding: 12px 16px; font-size: 15px; outline: none; font-family: inherit;
+    background: #f8fafc; transition: border .15s;
+  }
+  #q:focus { border-color: var(--teal-l); background: #fff; }
+  #send {
+    width: 46px; height: 46px; border-radius: 50%; border: none;
+    background: var(--teal); color: #fff; font-size: 20px; cursor: pointer;
+    display: grid; place-items: center; flex-shrink: 0; transition: .15s;
+  }
+  #send:active { transform: scale(.9); background: var(--teal-d); }
+
+  .fade { animation: fade .3s ease; }
+  @keyframes fade { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+
+  /* ---------- Modal / Overlay ---------- */
+  .overlay {
+    position: absolute; inset: 0; background: rgba(15,23,42,.5);
+    backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center;
+    z-index: 50; padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 18px; width: 100%; max-width: 340px;
+    padding: 22px; box-shadow: 0 20px 50px rgba(0,0,0,.3); animation: pop .25s ease;
+  }
+  @keyframes pop { from{opacity:0; transform:scale(.9)} to{opacity:1; transform:scale(1)} }
+  .modal h3 { font-size: 18px; margin-bottom: 6px; display:flex; align-items:center; gap:8px; }
+  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .pin-input {
+    width: 100%; text-align: center; letter-spacing: 12px; font-size: 26px; font-weight: 800;
+    border: 2px solid #cbd5e1; border-radius: 12px; padding: 12px; outline: none;
+    font-family: monospace;
+  }
+  .pin-input:focus { border-color: var(--teal); }
+  .pin-err { color: #dc2626; font-size: 13px; margin-top: 8px; min-height: 18px; text-align: center; font-weight: 600; }
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+  .btn {
+    flex: 1; border: none; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 700;
+    cursor: pointer; font-family: inherit; transition: .15s;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn-primary { background: var(--teal); color: #fff; }
+  .btn-ghost { background: #f1f5f9; color: var(--text); }
+
+  /* ---------- Admin panel (full screen) ---------- */
+  #admin {
+    position: absolute; inset: 0; background: var(--bg); z-index: 60;
+    display: none; flex-direction: column;
+  }
+  #admin.show { display: flex; }
+  .adm-head {
+    background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff;
+    padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top));
+    display: flex; align-items: center; gap: 12px;
+  }
+  .adm-head .t { font-size: 17px; font-weight: 700; }
+  .adm-head .s { font-size: 12px; opacity: .8; }
+  .adm-back { background: rgba(255,255,255,.15); border: none; color: #fff; border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; margin-left: auto; }
+  .adm-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  .panel { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .panel h4 { font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 7px; }
+  .panel .hint { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+
+  .mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+  .mode-toggle label {
+    flex: 1; text-align: center; padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 10px;
+    font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: .15s;
+  }
+  .mode-toggle input { display: none; }
+  .mode-toggle input:checked + label { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+  .upload-zone {
+    border: 2px dashed var(--teal-l); border-radius: 12px; padding: 22px 14px; text-align: center;
+    background: #f0fdfa; cursor: pointer; transition: .15s;
+  }
+  .upload-zone:active { background: #ccfbf1; }
+  .upload-zone .ico { font-size: 34px; }
+  .upload-zone .big { font-weight: 700; font-size: 15px; margin-top: 6px; }
+  .upload-zone .sm { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  .act-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .act-btns .btn { flex: 1; min-width: 130px; font-size: 13.5px; padding: 11px; }
+  .btn-out { background: #fff; color: var(--teal); border: 1.5px solid var(--teal); }
+
+  .import-log { font-size: 13px; line-height: 1.7; margin-top: 12px; padding: 12px; border-radius: 10px; display: none; }
+  .import-log.ok { display: block; background: #dcfce7; color: #14532d; }
+  .import-log.warn { display: block; background: #fef9c3; color: #713f12; }
+  .import-log.bad { display: block; background: #fee2e2; color: #7f1d1d; }
+
+  /* inventory table */
+  .inv-count { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .inv-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+  .inv-item:last-child { border-bottom: none; }
+  .inv-code { font-family: monospace; font-weight: 700; font-size: 12.5px; background: #f1f5f9; padding: 3px 7px; border-radius: 6px; color: var(--teal-d); flex-shrink: 0; }
+  .inv-name { flex: 1; font-size: 13.5px; line-height: 1.3; }
+  .inv-name small { color: var(--muted); display: block; font-size: 11.5px; }
+  .inv-qty-edit { width: 66px; text-align: center; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 7px 4px; font-size: 14px; font-weight: 700; font-family: inherit; outline: none; }
+  .inv-qty-edit:focus { border-color: var(--teal); }
+  .inv-unit { font-size: 11px; color: var(--muted); width: 34px; text-align: left; flex-shrink: 0; }
+</style>
+
+<header>
+  <div class="avatar">📦</div>
+  <div>
+    <div class="h-title">ผู้ช่วยคลังพัสดุ</div>
+    <div class="h-sub"><span class="dot"></span> ออนไลน์ · ค้นหารหัสพัสดุ</div>
+  </div>
+  <button class="gear" id="installBtn" title="ติดตั้งแอป" style="display:none;margin-left:auto">⬇️</button>
+  <button class="gear" id="gearBtn" title="โหมดผู้ดูแล">⚙️</button>
+</header>
+
+<div id="chat"></div>
+
+<footer>
+  <input id="q" type="text" placeholder="พิมพ์ชื่อสินค้า เช่น สายไฟ, ปากกา..." autocomplete="off" />
+  <button id="send">➤</button>
+</footer>
+
+<!-- PIN modal -->
+<div class="overlay" id="pinOverlay">
+  <div class="modal">
+    <h3>🔒 โหมดผู้ดูแล</h3>
+    <p>กรุณาใส่รหัส PIN 4 หลักเพื่อเข้าจัดการข้อมูลคลัง</p>
+    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="4" placeholder="••••" />
+    <div class="pin-err" id="pinErr"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="pinCancel">ยกเลิก</button>
+      <button class="btn btn-primary" id="pinOk">เข้าสู่ระบบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin panel -->
+<div id="admin">
+  <div class="adm-head">
+    <div>
+      <div class="t">🛠️ จัดการคลังพัสดุ</div>
+      <div class="s">โหมดผู้ดูแล (Admin)</div>
+    </div>
+    <button class="adm-back" id="admBack">← กลับ</button>
+  </div>
+  <div class="adm-body">
+
+    <div class="panel">
+      <h4>📤 อัปโหลดไฟล์ (Excel / CSV)</h4>
+      <div class="hint">อัปโหลดไฟล์เพื่ออัปเดตสต็อกหรือเพิ่มรายการใหม่ · ระบบจับคู่ด้วย <b>รหัสพัสดุ</b> — ถ้ามีอยู่แล้วจะอัปเดต ถ้ายังไม่มีจะเพิ่มใหม่</div>
+
+      <div class="mode-toggle">
+        <input type="radio" name="mode" id="modeSet" value="set" checked>
+        <label for="modeSet">🔄 แทนที่จำนวน<br><small>(ตั้งค่าใหม่ตามไฟล์)</small></label>
+        <input type="radio" name="mode" id="modeAdd" value="add">
+        <label for="modeAdd">➕ บวกเพิ่มจำนวน<br><small>(รับของเข้าคลัง)</small></label>
+      </div>
+
+      <div class="upload-zone" id="uploadZone">
+        <div class="ico">📁</div>
+        <div class="big">แตะเพื่อเลือกไฟล์</div>
+        <div class="sm">รองรับ .xlsx, .xls, .csv</div>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+
+      <div class="import-log" id="importLog"></div>
+    </div>
+
+    <div class="panel">
+      <h4>📥 เทมเพลต & สำรองข้อมูล</h4>
+      <div class="hint">ยังไม่มีไฟล์? ดาวน์โหลดเทมเพลตไปกรอก แล้วอัปโหลดกลับได้เลย</div>
+      <div class="act-btns">
+        <button class="btn btn-out" id="dlTemplate">⬇️ ดาวน์โหลดเทมเพลต</button>
+        <button class="btn btn-out" id="dlCurrent">💾 ส่งออกข้อมูลปัจจุบัน</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4>✏️ แก้ไขจำนวนด่วน</h4>
+      <div class="hint">แก้จำนวนในช่องแล้วกดบันทึก (สำหรับปรับทีละรายการ)</div>
+      <div class="inv-count" id="invCount"></div>
+      <div id="invList"></div>
+      <div class="act-btns" style="margin-top:14px">
+        <button class="btn btn-primary" id="saveQty">💾 บันทึกจำนวน</button>
+        <button class="btn btn-out" id="resetData" style="color:#dc2626;border-color:#fecaca">♻️ รีเซ็ตเป็นค่าเริ่มต้น</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ================= ค่าเริ่มต้น ฐานข้อมูลพัสดุ 10 รายการ ================= */
+const DEFAULT_DB = [
+  { code:"MT-1001", name:"ปากกาลูกลื่น สีน้ำเงิน", cat:"เครื่องเขียน", unit:"ด้าม", qty:240, kw:["ปากกา","ปากกาลูกลื่น","ปากกาน้ำเงิน","pen","ballpoint"] },
+  { code:"MT-1002", name:"กระดาษถ่ายเอกสาร A4 80 แกรม", cat:"เครื่องเขียน", unit:"รีม", qty:58, kw:["กระดาษ","กระดาษ a4","a4","กระดาษถ่ายเอกสาร","paper"] },
+  { code:"MT-1003", name:"สายไฟ THW 2.5 sq.mm.", cat:"ไฟฟ้า", unit:"เมตร", qty:1200, kw:["สายไฟ","สายไฟฟ้า","thw","wire","cable","สายทองแดง"] },
+  { code:"MT-1004", name:"หลอดไฟ LED 12W ขั้ว E27", cat:"ไฟฟ้า", unit:"หลอด", qty:15, kw:["หลอดไฟ","หลอด led","led","หลอดไฟฟ้า","bulb","lamp"] },
+  { code:"MT-1005", name:"ถุงมือผ้าเคลือบยาง", cat:"อุปกรณ์เซฟตี้", unit:"คู่", qty:0, kw:["ถุงมือ","ถุงมือผ้า","glove","gloves","ถุงมือยาง"] },
+  { code:"MT-1006", name:"หมวกนิรภัย (Safety Helmet) สีขาว", cat:"อุปกรณ์เซฟตี้", unit:"ใบ", qty:34, kw:["หมวก","หมวกนิรภัย","helmet","หมวกเซฟตี้","safety helmet"] },
+  { code:"MT-1007", name:"น็อตหัวหกเหลี่ยม M8 x 40mm", cat:"ฮาร์ดแวร์", unit:"ตัว", qty:860, kw:["น็อต","นอต","สกรู","bolt","screw","m8","น็อตหกเหลี่ยม"] },
+  { code:"MT-1008", name:"เทปพันสายไฟ PVC สีดำ", cat:"ไฟฟ้า", unit:"ม้วน", qty:120, kw:["เทป","เทปพันสายไฟ","เทปพันไฟฟ้า","tape","เทปดำ","pvc tape"] },
+  { code:"MT-1009", name:"น้ำมันหล่อลื่นอเนกประสงค์ WD-40", cat:"เคมีภัณฑ์", unit:"กระป๋อง", qty:9, kw:["น้ำมัน","wd40","wd-40","น้ำมันหล่อลื่น","สเปรย์","lubricant"] },
+  { code:"MT-1010", name:"แบตเตอรี่อัลคาไลน์ AA (แพ็ค 4)", cat:"อุปกรณ์ทั่วไป", unit:"แพ็ค", qty:47, kw:["แบต","แบตเตอรี่","ถ่าน","ถ่านไฟฉาย","battery","aa"] },
+];
+
+const ADMIN_PIN = "1234";
+const STORE_KEY = "warehouse_db_v1";
+
+/* โหลด/บันทึกข้อมูล (localStorage เพื่อให้ข้อมูลอยู่ถาวร) */
+let DB = loadDB();
+function loadDB(){
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ const d = JSON.parse(raw); if(Array.isArray(d) && d.length) return d; }
+  } catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_DB));
+}
+function saveDB(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } catch(e){} }
+
+/* ================= ค้นหา + เดาคำ (fuzzy) ================= */
+function normalize(s){ return String(s==null?"":s).toLowerCase().replace(/[\s\-\._]/g,"").trim(); }
+
+function lev(a,b){
+  a=normalize(a); b=normalize(b);
+  const m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++) d[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+    const c=a[i-1]===b[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+c);
+  }
+  return d[m][n];
+}
+
+function scoreItem(query, item){
+  const q = normalize(query);
+  if(!q) return 0;
+  let best = 0;
+  const targets = [item.name, item.code, ...(item.kw||[])];
+  for(const t of targets){
+    const nt = normalize(t);
+    if(!nt) continue;
+    let s = 0;
+    if(nt === q) s = 100;
+    else if(nt.includes(q) || q.includes(nt)) s = 80 - Math.abs(nt.length-q.length);
+    else {
+      const dist = lev(q, nt);
+      const maxLen = Math.max(q.length, nt.length);
+      const sim = 1 - dist/maxLen;
+      if(sim >= 0.5) s = Math.round(sim * 70);
+    }
+    if(s > best) best = s;
+  }
+  return best;
+}
+
+function search(query){
+  return DB.map(it=>({ it, score: scoreItem(query,it) }))
+           .filter(r=>r.score > 0)
+           .sort((a,b)=>b.score-a.score);
+}
+
+/* ================= UI แชท ================= */
+const chat = document.getElementById('chat');
+const input = document.getElementById('q');
+const sendBtn = document.getElementById('send');
+
+function scrollDown(){ chat.scrollTop = chat.scrollHeight; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function addUser(text){
+  const row = document.createElement('div');
+  row.className = 'row user fade';
+  row.innerHTML = `<div class="bubble"></div>`;
+  row.querySelector('.bubble').textContent = text;
+  chat.appendChild(row); scrollDown();
+}
+function botRow(html){
+  const row = document.createElement('div');
+  row.className = 'row bot fade';
+  row.innerHTML = `<div class="mini-av">📦</div><div class="bubble">${html}</div>`;
+  chat.appendChild(row); scrollDown();
+  return row;
+}
+function typing(){
+  const row = document.createElement('div');
+  row.className = 'row bot typing fade';
+  row.innerHTML = `<div class="mini-av">📦</div><div class="bubble"><span></span><span></span><span></span></div>`;
+  chat.appendChild(row); scrollDown();
+  return row;
+}
+function stockPill(qty){
+  if(qty<=0) return `<span class="stock-pill out">หมดสต็อก</span>`;
+  if(qty<=20) return `<span class="stock-pill low">เหลือน้อย (${qty})</span>`;
+  return `<span class="stock-pill in">พร้อมเบิก (${qty})</span>`;
+}
+function cardHTML(it){
+  return `<div class="card">
+    <div class="name">✅ ${esc(it.name)}</div>
+    <div class="code-line">
+      <span>รหัสพัสดุ:</span>
+      <span class="code">${esc(it.code)}</span>
+      <button class="copy-btn" onclick="copyCode('${esc(it.code)}',this)">📋 คัดลอก</button>
+    </div>
+    <div class="meta">
+      <b>หมวดหมู่:</b> ${esc(it.cat)} &nbsp;·&nbsp; <b>หน่วยนับ:</b> ${esc(it.unit)}<br>
+      <b>สถานะ:</b> ${stockPill(it.qty)}
+    </div>
+  </div>`;
+}
+window.copyCode = function(code, btn){
+  navigator.clipboard?.writeText(code);
+  const old = btn.innerHTML;
+  btn.innerHTML = "✔ คัดลอกแล้ว";
+  setTimeout(()=>btn.innerHTML=old, 1400);
+};
+function chipsHTML(items, prefix){
+  return `<div style="margin-top:2px">${prefix||''}<div class="chips">` +
+    items.map(it=>`<span class="chip" onclick="ask('${esc(it.name).replace(/'/g,"\\'")}')">${esc(it.name)}</span>`).join('') +
+    `</div></div>`;
+}
+function respond(query){
+  const t = typing();
+  setTimeout(()=>{
+    t.remove();
+    const results = search(query);
+    if(results.length === 0){
+      botRow(`ขออภัยครับ ไม่พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” 😕<br>ลองพิมพ์ใหม่ หรือเลือกจากรายการที่มีในคลังได้เลยครับ`);
+      botRow(chipsHTML(DB.slice(0,6), `<div style="font-size:13px;color:#64748b;margin-bottom:2px">📋 ตัวอย่างพัสดุในคลัง:</div>`));
+      return;
+    }
+    const top = results[0];
+    if(top.score >= 80){
+      botRow(`พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” แล้วครับ 👇`);
+      botRow(cardHTML(top.it));
+      const others = results.slice(1).filter(r=>r.score>=60).slice(0,3);
+      if(others.length) botRow(chipsHTML(others.map(r=>r.it), `<div style="font-size:13px;color:#64748b;margin-bottom:2px">🔎 รายการใกล้เคียงอื่น ๆ:</div>`));
+    } else {
+      botRow(`ไม่พบคำว่า “<b>${esc(query)}</b>” พอดีเป๊ะ ๆ ครับ 🤔<br>คุณหมายถึงรายการนี้หรือเปล่า?`);
+      botRow(cardHTML(top.it));
+      const others = results.slice(1).filter(r=>r.score>=35).slice(0,3);
+      if(others.length) botRow(chipsHTML(others.map(r=>r.it), `<div style="font-size:13px;color:#64748b;margin-bottom:2px">หรืออาจเป็นรายการเหล่านี้:</div>`));
+    }
+  }, 550);
+}
+function ask(text){ addUser(text); respond(text); }
+window.ask = ask;
+function submit(){ const v = input.value.trim(); if(!v) return; input.value=''; ask(v); }
+sendBtn.addEventListener('click', submit);
+input.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+
+/* ================= โหมดผู้ดูแล (Admin) ================= */
+const pinOverlay = document.getElementById('pinOverlay');
+const pinInput = document.getElementById('pinInput');
+const pinErr = document.getElementById('pinErr');
+const adminPanel = document.getElementById('admin');
+
+document.getElementById('gearBtn').addEventListener('click', ()=>{
+  pinInput.value=''; pinErr.textContent='';
+  pinOverlay.classList.add('show');
+  setTimeout(()=>pinInput.focus(), 100);
+});
+document.getElementById('pinCancel').addEventListener('click', ()=> pinOverlay.classList.remove('show'));
+document.getElementById('pinOk').addEventListener('click', tryPin);
+pinInput.addEventListener('keydown', e=>{ if(e.key==='Enter') tryPin(); });
+pinInput.addEventListener('input', ()=>{ pinErr.textContent=''; if(pinInput.value.length===4) tryPin(); });
+
+function tryPin(){
+  if(pinInput.value === ADMIN_PIN){
+    pinOverlay.classList.remove('show');
+    openAdmin();
+  } else {
+    pinErr.textContent = "รหัส PIN ไม่ถูกต้อง ลองอีกครั้ง";
+    pinInput.value=''; pinInput.focus();
+  }
+}
+document.getElementById('admBack').addEventListener('click', ()=> adminPanel.classList.remove('show'));
+
+function openAdmin(){
+  renderInvList();
+  document.getElementById('importLog').className = 'import-log';
+  adminPanel.classList.add('show');
+}
+
+/* ----- รายการแก้ไขจำนวนด่วน ----- */
+function renderInvList(){
+  document.getElementById('invCount').textContent = `มีทั้งหมด ${DB.length} รายการ`;
+  const list = document.getElementById('invList');
+  list.innerHTML = DB.map((it,i)=>`
+    <div class="inv-item">
+      <span class="inv-code">${esc(it.code)}</span>
+      <div class="inv-name">${esc(it.name)}<small>${esc(it.cat)}</small></div>
+      <input class="inv-qty-edit" data-i="${i}" type="number" inputmode="numeric" value="${it.qty}">
+      <span class="inv-unit">${esc(it.unit)}</span>
+    </div>`).join('');
+}
+document.getElementById('saveQty').addEventListener('click', ()=>{
+  document.querySelectorAll('.inv-qty-edit').forEach(inp=>{
+    const i = +inp.dataset.i; const v = parseInt(inp.value);
+    if(!isNaN(v)) DB[i].qty = v;
+  });
+  saveDB();
+  showLog('ok', `✅ บันทึกจำนวนเรียบร้อยแล้ว (${DB.length} รายการ)`);
+});
+document.getElementById('resetData').addEventListener('click', ()=>{
+  if(confirm('ต้องการรีเซ็ตข้อมูลทั้งหมดกลับเป็นค่าเริ่มต้น 10 รายการใช่หรือไม่?')){
+    DB = JSON.parse(JSON.stringify(DEFAULT_DB));
+    saveDB(); renderInvList();
+    showLog('warn', '♻️ รีเซ็ตข้อมูลกลับเป็นค่าเริ่มต้นแล้ว');
+  }
+});
+
+function showLog(type, html){
+  const el = document.getElementById('importLog');
+  el.className = 'import-log ' + type;
+  el.innerHTML = html;
+}
+
+/* ----- อัปโหลดไฟล์ ----- */
+const fileInput = document.getElementById('fileInput');
+document.getElementById('uploadZone').addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', handleFile);
+
+function currentMode(){ return document.querySelector('input[name="mode"]:checked').value; }
+
+function handleFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const name = file.name.toLowerCase();
+  const reader = new FileReader();
+
+  if(name.endsWith('.csv')){
+    reader.onload = ev => {
+      try { processRows(parseCSV(ev.target.result)); }
+      catch(err){ showLog('bad', '❌ อ่านไฟล์ CSV ไม่สำเร็จ: ' + err.message); }
+    };
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    if(typeof XLSX === 'undefined'){
+      showLog('bad', '❌ อ่านไฟล์ Excel ไม่ได้ (ต้องต่ออินเทอร์เน็ตเพื่อโหลดตัวอ่าน Excel)<br>💡 วิธีแก้: บันทึกไฟล์เป็น <b>.csv</b> แล้วอัปโหลดใหม่ (ใช้งานออฟไลน์ได้)');
+      fileInput.value=''; return;
+    }
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+        processRows(rows);
+      } catch(err){ showLog('bad', '❌ อ่านไฟล์ Excel ไม่สำเร็จ: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  fileInput.value='';
+}
+
+/* map ชื่อคอลัมน์ (รองรับทั้งไทย/อังกฤษ) */
+function pick(row, keys){
+  for(const k of Object.keys(row)){
+    const nk = normalize(k);
+    for(const want of keys){ if(nk === normalize(want)) return row[k]; }
+  }
+  return '';
+}
+function parseKw(raw, name){
+  let kw = String(raw||'').split(/[|,;]/).map(s=>s.trim()).filter(Boolean);
+  if(!kw.length && name){ kw = String(name).split(/\s+/).map(s=>s.trim()).filter(s=>s.length>1); }
+  return kw;
+}
+
+function processRows(rows){
+  if(!rows || !rows.length){ showLog('bad', '❌ ไม่พบข้อมูลในไฟล์'); return; }
+  const mode = currentMode();
+  let added=0, updated=0; const errs=[];
+
+  rows.forEach((r,idx)=>{
+    const code = String(pick(r,['รหัสพัสดุ','รหัส','code','รหัสสินค้า'])).trim();
+    const name = String(pick(r,['ชื่อพัสดุ','ชื่อ','ชื่อสินค้า','name','รายการ'])).trim();
+    const cat  = String(pick(r,['หมวดหมู่','หมวด','category','cat'])).trim();
+    const unit = String(pick(r,['หน่วยนับ','หน่วย','unit'])).trim();
+    const kwRaw= pick(r,['คำค้นหา','คำค้น','keywords','kw','คีย์เวิร์ด']);
+    const qtyRaw = pick(r,['จำนวน','สต็อก','qty','quantity','stock','คงเหลือ']);
+    const qty = parseInt(String(qtyRaw).replace(/[, ]/g,''));
+
+    if(!code && !name) return; // ข้ามแถวว่าง
+
+    let item = code ? DB.find(d=> normalize(d.code)===normalize(code)) : null;
+    if(!item && name) item = DB.find(d=> normalize(d.name)===normalize(name));
+
+    if(item){
+      if(!isNaN(qty)) item.qty = (mode==='add') ? (item.qty + qty) : qty;
+      if(name) item.name = name;
+      if(cat)  item.cat = cat;
+      if(unit) item.unit = unit;
+      if(String(kwRaw).trim()) item.kw = parseKw(kwRaw, item.name);
+      updated++;
+    } else {
+      if(!code){ errs.push(`แถว ${idx+2}: เพิ่มรายการใหม่ไม่ได้ (ไม่มีรหัสพัสดุ)`); return; }
+      DB.push({
+        code, name: name||code, cat: cat||'ทั่วไป', unit: unit||'หน่วย',
+        qty: isNaN(qty)?0:qty, kw: parseKw(kwRaw, name)
+      });
+      added++;
+    }
+  });
+
+  saveDB();
+  renderInvList();
+
+  const modeTxt = mode==='add' ? 'บวกเพิ่มจำนวน' : 'แทนที่จำนวน';
+  let msg = `✅ นำเข้าสำเร็จ (โหมด: ${modeTxt})<br>• อัปเดต <b>${updated}</b> รายการ<br>• เพิ่มใหม่ <b>${added}</b> รายการ<br>• คลังมีทั้งหมด <b>${DB.length}</b> รายการ`;
+  if(errs.length){
+    msg += `<br><br>⚠️ ข้ามไป ${errs.length} แถว:<br>` + errs.slice(0,5).map(esc).join('<br>');
+    showLog('warn', msg);
+  } else {
+    showLog('ok', msg);
+  }
+}
+
+/* CSV parser (รองรับ field ที่มี " ") */
+function parseCSV(text){
+  text = text.replace(/^\uFEFF/, '');
+  const rows = [];
+  let cur = [], val = '', q = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(q){
+      if(c === '"'){ if(text[i+1]==='"'){ val+='"'; i++; } else q=false; }
+      else val += c;
+    } else {
+      if(c === '"') q=true;
+      else if(c === ',') { cur.push(val); val=''; }
+      else if(c === '\n'){ cur.push(val); rows.push(cur); cur=[]; val=''; }
+      else if(c === '\r'){}
+      else val += c;
+    }
+  }
+  if(val.length || cur.length){ cur.push(val); rows.push(cur); }
+  if(!rows.length) return [];
+  const headers = rows[0].map(h=>h.trim());
+  return rows.slice(1).filter(r=>r.some(c=>String(c).trim()!==''))
+    .map(r=>{ const o={}; headers.forEach((h,i)=> o[h]= (r[i]!==undefined? r[i] : '')); return o; });
+}
+
+/* ----- ดาวน์โหลดเทมเพลต / ส่งออก ----- */
+function download(filename, content, mime){
+  const blob = new Blob(["\uFEFF"+content], {type: mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+function toCSV(items){
+  const head = ['รหัสพัสดุ','ชื่อพัสดุ','หมวดหมู่','หน่วยนับ','จำนวน','คำค้นหา'];
+  const lines = [head.join(',')];
+  items.forEach(it=>{
+    const kw = (it.kw||[]).join('|');
+    const row = [it.code, it.name, it.cat, it.unit, it.qty, kw]
+      .map(v=>{ v=String(v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; });
+    lines.push(row.join(','));
+  });
+  return lines.join('\r\n');
+}
+document.getElementById('dlTemplate').addEventListener('click', ()=>{
+  const sample = [
+    { code:'MT-1011', name:'ไขควงแฉก 4 นิ้ว', cat:'ฮาร์ดแวร์', unit:'อัน', qty:25, kw:['ไขควง','ไขควงแฉก','screwdriver'] },
+    { code:'MT-1003', name:'สายไฟ THW 2.5 sq.mm.', cat:'ไฟฟ้า', unit:'เมตร', qty:500, kw:['สายไฟ','thw'] },
+  ];
+  download('เทมเพลตพัสดุ.csv', toCSV(sample), 'text/csv;charset=utf-8');
+});
+document.getElementById('dlCurrent').addEventListener('click', ()=>{
+  download('ข้อมูลคลังพัสดุ.csv', toCSV(DB), 'text/csv;charset=utf-8');
+});
+
+/* ================= ข้อความต้อนรับ ================= */
+window.addEventListener('load', ()=>{
+  setTimeout(()=>{
+    botRow(`สวัสดีครับ 👋 ผมคือ <b>ผู้ช่วยคลังพัสดุ</b><br>พิมพ์ <b>ชื่อสินค้า</b> ที่ต้องการ แล้วผมจะบอก <b>รหัสพัสดุ</b> ให้ เพื่อนำไปใช้เบิกต่อได้เลยครับ`);
+  }, 300);
+  setTimeout(()=>{
+    botRow(chipsHTML(DB.slice(0,6), `<div style="font-size:13px;color:#64748b;margin-bottom:2px">👇 ลองแตะเลือกได้เลย หรือพิมพ์เองก็ได้:</div>`));
+  }, 900);
+});
+
+/* ================= PWA: Service Worker + ปุ่มติดตั้ง ================= */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+let deferredPrompt = null;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault(); deferredPrompt = e;
+  installBtn.style.display = 'grid';
+});
+installBtn.addEventListener('click', async ()=>{
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null; installBtn.style.display = 'none';
+});
+window.addEventListener('appinstalled', ()=> installBtn.style.display = 'none');
+</script>

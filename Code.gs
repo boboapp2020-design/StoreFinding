@@ -147,40 +147,98 @@ function lev_(a, b) {
 }
 
 /* ---------- ค้นหา ---------- */
-function searchCatalog_(qRaw, limit) {
-  var q = norm_(qRaw);
-  if (!q) return { mode: 'empty', items: [] };
-  limit = limit || DEFAULT_LIMIT;
+/* ============ พจนานุกรมคำพ้อง ไทย/ลาว ↔ อังกฤษ (แก้/เพิ่มได้ตามต้องการ) ============ */
+var SYN_GROUPS = [
+  ['ปากกา', 'ปากกาลูกลื่น', 'pen', 'ballpoint'],
+  ['ดินสอ', 'pencil'],
+  ['กระดาษ', 'paper'],
+  ['สายไฟ', 'สายเคเบิล', 'wire', 'cable'],
+  ['น็อต', 'นอต', 'สกรู', 'bolt', 'nut', 'screw'],
+  ['ถุงมือ', 'glove', 'gloves'],
+  ['หมวก', 'หมวกนิรภัย', 'helmet'],
+  ['หลอดไฟ', 'หลอด', 'bulb', 'lamp', 'led'],
+  ['เทป', 'tape'],
+  ['น้ำมัน', 'oil', 'lubricant'],
+  ['จารบี', 'grease'],
+  ['แบตเตอรี่', 'ถ่าน', 'battery'],
+  ['มอเตอร์', 'motor'],
+  ['ปั๊ม', 'ปั้ม', 'pump'],
+  ['ท่อ', 'pipe', 'tube'],
+  ['วาล์ว', 'ประตูน้ำ', 'valve'],
+  ['ลูกปืน', 'ตลับลูกปืน', 'bearing'],
+  ['สวิตช์', 'switch'],
+  ['เบรก', 'brake'],
+  ['กรอง', 'ไส้กรอง', 'filter'],
+  ['แหวน', 'washer'],
+  ['ประเก็น', 'ปะเก็น', 'gasket'],
+  ['ข้อต่อ', 'ข้องอ', 'elbow', 'joint', 'coupling', 'fitting'],
+  ['สายพาน', 'belt'],
+  ['โซ่', 'chain'],
+  ['พัดลม', 'fan'],
+  ['ฟิวส์', 'fuse'],
+  ['รีเลย์', 'relay'],
+  ['เซนเซอร์', 'sensor'],
+  ['เกจ', 'เกจวัด', 'gauge'],
+  ['ประแจ', 'wrench', 'spanner'],
+  ['ค้อน', 'hammer'],
+  ['ไขควง', 'screwdriver'],
+  ['คีม', 'plier', 'pliers'],
+  ['เลื่อย', 'saw'],
+  ['สว่าน', 'drill'],
+  ['ตะปู', 'nail'],
+  ['กาว', 'glue', 'adhesive'],
+  ['แปรง', 'brush'],
+  ['เชือก', 'rope'],
+  ['ยาง', 'tire', 'tyre', 'rubber'],
+  ['ลูกสูบ', 'piston'],
+  ['เพลา', 'shaft'],
+  ['เฟือง', 'gear'],
+  ['หัวฉีด', 'nozzle', 'injector'],
+  ['ถัง', 'tank', 'drum'],
+  ['ฝา', 'cover', 'cap', 'lid']
+];
 
-  var cat = readCatalog_().items;
+/* ขยายคำค้น → array ของคำ (normalize แล้ว) รวมคำพ้องข้ามภาษา */
+function expandQuery_(qRaw) {
+  var nq = norm_(qRaw);
+  var set = {}; set[nq] = true;
+  for (var g = 0; g < SYN_GROUPS.length; g++) {
+    var grp = SYN_GROUPS[g], hit = false;
+    for (var t = 0; t < grp.length; t++) {
+      var nt = norm_(grp[t]); if (!nt) continue;
+      if (nt === nq || (nq.length >= 2 && (nt.indexOf(nq) !== -1 || nq.indexOf(nt) !== -1))) { hit = true; break; }
+    }
+    if (hit) for (var k = 0; k < grp.length; k++) { var v = norm_(grp[k]); if (v) set[v] = true; }
+  }
+  return Object.keys(set);
+}
+
+/* ให้คะแนนแบบ ตรงตัว/เป็นส่วนหนึ่ง กับหลายคำค้น (variants) */
+function scoreExact_(cat, variants) {
   var hits = [];
-  var i, it, sc;
-
-  // รอบ 1: ตรงตัว / เป็นส่วนหนึ่งของข้อความ (เร็ว ครอบคลุมส่วนใหญ่)
-  for (i = 0; i < cat.length; i++) {
-    it = cat[i]; sc = 0;
-    if (it._nc === q || it._nn === q) sc = 100;
-    else if (it._nc.indexOf(q) !== -1) sc = 93;
-    else if (it._nn.indexOf(q) !== -1) sc = 85 - Math.min(20, Math.abs(it._nn.length - q.length));
+  for (var i = 0; i < cat.length; i++) {
+    var it = cat[i], sc = 0;
+    for (var v = 0; v < variants.length; v++) {
+      var q = variants[v]; if (!q) continue;
+      var s = 0;
+      if (it._nc === q || it._nn === q) s = 100;
+      else if (it._nc.indexOf(q) !== -1) s = 93;
+      else if (it._nn.indexOf(q) !== -1) s = 85 - Math.min(20, Math.abs(it._nn.length - q.length));
+      if (s > sc) sc = s;
+    }
     if (sc > 0) hits.push([sc, it]);
   }
-  if (hits.length) {
-    hits.sort(function (a, b) { return b[0] - a[0]; });
-    return { mode: 'match', items: hits.slice(0, limit).map(pub_) };
-  }
+  hits.sort(function (a, b) { return b[0] - a[0]; });
+  return hits;
+}
 
-  // รอบ 2 (เมื่อไม่เจอเลย): เดาคำด้วย fuzzy แบบเทียบรายคำ (token)
-  // รองรับทั้ง "พิมพ์ผิด" (สลับ/ตกตัวอักษร) และ "พิมพ์ไม่ครบคำ" (เทียบกับส่วนหน้าของคำ)
-  var best = [];
-  var qlen = q.length;
-  for (i = 0; i < cat.length; i++) {
-    it = cat[i];
-    var toks = it._tk || [];
-    var localBest = 0;
+/* เดาคำพิมพ์ผิด (fuzzy) กับคำเดียว */
+function scoreFuzzy_(cat, q) {
+  var best = [], qlen = q.length;
+  for (var i = 0; i < cat.length; i++) {
+    var it = cat[i], toks = it._tk || [], localBest = 0;
     for (var ti = 0; ti < toks.length; ti++) {
-      var tk = toks[ti];
-      if (!tk) continue;
-      // ถ้าคำยาวกว่าคำค้นมาก → เทียบเฉพาะส่วนหน้าของคำ (กรณีผู้ใช้พิมพ์ไม่ครบ)
+      var tk = toks[ti]; if (!tk) continue;
       var cand = (tk.length > qlen + 1) ? tk.substring(0, qlen) : tk;
       if (Math.abs(cand.length - qlen) > 3) continue;
       var sim = 1 - lev_(q, cand) / Math.max(qlen, cand.length);
@@ -189,7 +247,80 @@ function searchCatalog_(qRaw, limit) {
     if (localBest >= 0.6) best.push([localBest, it]);
   }
   best.sort(function (a, b) { return b[0] - a[0]; });
-  return { mode: best.length ? 'fuzzy' : 'none', items: best.slice(0, limit).map(function (x) { return pub_(x[1]); }) };
+  return best;
+}
+
+/* ตั้งค่า AI ใน Script Properties (Project Settings → Script Properties)
+ *   AI_API_KEY  = คีย์ของผู้ให้บริการ (ต้องมี ไม่งั้นข้าม AI)
+ *   AI_API_URL  = endpoint (ค่าเริ่มต้น Groq) — เปลี่ยนได้ตามผู้ให้บริการ
+ *   AI_MODEL    = ชื่อโมเดล (ค่าเริ่มต้น llama-3.1-8b-instant)
+ * รองรับทุกเจ้าที่ใช้รูปแบบ OpenAI /chat/completions:
+ *   Groq        : https://api.groq.com/openai/v1/chat/completions   | llama-3.3-70b-versatile
+ *   OpenAI      : https://api.openai.com/v1/chat/completions        | gpt-4o-mini
+ *   OpenRouter  : https://openrouter.ai/api/v1/chat/completions     | (หลายโมเดล)
+ *   Together    : https://api.together.xyz/v1/chat/completions      | ...
+ */
+function aiInterpret_(qRaw) {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty('AI_API_KEY') || props.getProperty('GROQ_API_KEY');
+  if (!key) return [];
+  var url = props.getProperty('AI_API_URL') || 'https://api.groq.com/openai/v1/chat/completions';
+  var model = props.getProperty('AI_MODEL') || 'llama-3.1-8b-instant';
+  try {
+    var payload = {
+      model: model,
+      temperature: 0, max_tokens: 60,
+      messages: [
+        { role: 'system', content:
+          'You are a search assistant for a factory warehouse / spare-parts catalog (sugar mill). ' +
+          'Item names in the database are mostly ENGLISH technical terms (e.g. BALLPOINT PEN, BEARING, VALVE, ELBOW). ' +
+          'Users search in Thai, Lao, or English and may be vague. ' +
+          'Map the user query to the concise ENGLISH keyword(s) most likely to appear in the item name. ' +
+          'Reply with ONLY 1-5 comma-separated keywords, no explanation.' },
+        { role: 'user', content: String(qRaw) }
+      ]
+    };
+    var res = UrlFetchApp.fetch(url, {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + key },
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+    var data = JSON.parse(res.getContentText());
+    var text = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+    return text.split(/[,\n]/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 5);
+  } catch (e) { return []; }
+}
+
+/* ---------- ค้นหา: พจนานุกรม → เดาคำ → Groq ---------- */
+function searchCatalog_(qRaw, limit) {
+  var q = norm_(qRaw);
+  if (!q) return { mode: 'empty', items: [] };
+  limit = limit || DEFAULT_LIMIT;
+  var cat = readCatalog_().items;
+
+  // 1) พจนานุกรมคำพ้อง (ข้ามภาษา) + ตรงตัว/เป็นส่วนหนึ่ง
+  var variants = expandQuery_(qRaw);
+  var hits = scoreExact_(cat, variants);
+  if (hits.length) return { mode: 'match', items: hits.slice(0, limit).map(pub_) };
+
+  // 2) เดาคำพิมพ์ผิด
+  var fz = scoreFuzzy_(cat, q);
+  if (fz.length) return { mode: 'fuzzy', items: fz.slice(0, limit).map(pub_) };
+
+  // 3) ให้ AI แปลคำ แล้วค้นซ้ำ (ถ้าตั้ง key ไว้)
+  var ai = aiInterpret_(qRaw);
+  if (ai.length) {
+    var av = [];
+    for (var a = 0; a < ai.length; a++) av.push(norm_(ai[a]));
+    var ah = scoreExact_(cat, av);
+    if (!ah.length) {
+      for (var b = 0; b < av.length; b++) ah = ah.concat(scoreFuzzy_(cat, av[b]));
+      ah.sort(function (x, y) { return y[0] - x[0]; });
+    }
+    if (ah.length) return { mode: 'ai', ai: ai.join(', '), items: ah.slice(0, limit).map(pub_) };
+  }
+
+  return { mode: 'none', items: [] };
 }
 
 /* ตัวอย่างรายการ (อ่านเฉพาะแถวต้น ๆ เพื่อความเร็วตอนเปิดแอป) */
@@ -231,7 +362,7 @@ function doGet(e) {
   try {
     if (action === 'search') {
       var res = searchCatalog_(p.q || '', parseInt(p.limit) || DEFAULT_LIMIT);
-      return json_({ ok: true, mode: res.mode, count: res.items.length, items: res.items, q: p.q || '' });
+      return json_({ ok: true, mode: res.mode, ai: res.ai || '', count: res.items.length, items: res.items, q: p.q || '' });
     }
     if (action === 'sample') {
       return json_({ ok: true, items: sample_(parseInt(p.n) || 6) });

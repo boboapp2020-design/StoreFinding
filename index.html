@@ -244,7 +244,7 @@
 </style>
 
 <header>
-  <div class="avatar"><img src="robot.png" alt="AI robot" /></div>
+  <div class="avatar"><img src="na.png" alt="ผู้ช่วยคลังพัสดุ" /></div>
   <div>
     <div class="h-title">ผู้ช่วยคลังพัสดุ</div>
     <div class="h-sub"><span class="dot"></span> ออนไลน์ · ค้นหารหัสพัสดุ</div>
@@ -494,7 +494,7 @@ const sendBtn = document.getElementById('send');
 function scrollDown(){ chat.scrollTop = chat.scrollHeight; }
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function nowHM(){ const d=new Date(); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
-const AVATAR = '<div class="mini-av"><img src="robot.png" alt=""></div>';
+const AVATAR = '<div class="mini-av"><img src="na.png" alt=""></div>';
 
 function addUser(text){
   const row = document.createElement('div');
@@ -599,7 +599,9 @@ function renderResults(query, res){
     botRow(`ขออภัยครับ ไม่พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” 😕<br>ลองพิมพ์ชื่อ/รหัสให้สั้นลง หรือใช้คำอื่นดูครับ`, true);
     return;
   }
-  if(res.mode === 'fuzzy'){
+  if(res.mode === 'ai'){
+    botRow(`🤖 ผมเข้าใจว่า “<b>${esc(query)}</b>” หมายถึง <b>${esc(res.ai||'')}</b><br>พบรายการนี้ครับ 👇`, true);
+  } else if(res.mode === 'fuzzy'){
     botRow(`ไม่พบคำว่า “<b>${esc(query)}</b>” พอดีเป๊ะ ๆ ครับ 🤔<br>คุณหมายถึงรายการนี้หรือเปล่า?`, true);
   } else {
     const more = res.count>1 ? ` (พบ ${res.count}${res.count>=8?'+':''} รายการ)` : '';

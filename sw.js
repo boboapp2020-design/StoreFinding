@@ -1,11 +1,11 @@
 /* Service Worker — ผู้ช่วยคลังพัสดุ (offline support) */
-const CACHE = 'warehouse-app-v3';
+const CACHE = 'warehouse-app-v4';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './xlsx.full.min.js',
-  './robot.png',
+  './na.png',
   './icon-192.png',
   './icon-512.png',
   './icon-512-maskable.png',

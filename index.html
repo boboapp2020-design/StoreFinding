@@ -201,6 +201,13 @@
   .btn-primary { background: var(--pri); color: #fff; }
   .btn-ghost { background: #eef2f9; color: var(--text); }
 
+  /* ช่องตั้ง PIN ใหม่ (โหมดแอดมิน) */
+  .pin-field { margin-top: 12px; }
+  .pin-field label { display: block; font-size: 12.5px; font-weight: 700; color: #33507a; margin-bottom: 6px; }
+  .pin-set { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 13px 14px; font-size: 22px; font-weight: 800; letter-spacing: 10px; text-align: center; outline: none; font-family: monospace; background: #f4f8ff; transition: .15s; }
+  .pin-set::placeholder { letter-spacing: 6px; color: #c3d3ea; font-size: 20px; }
+  .pin-set:focus { border-color: var(--pri); background: #fff; }
+
   /* ---------- Admin panel ---------- */
   #admin { position: absolute; inset: 0; background: linear-gradient(180deg,#eaf3ff,#dbe9ff); z-index: 60; display: none; flex-direction: column; }
   #admin.show { display: flex; }
@@ -317,14 +324,16 @@
 
     <div class="panel">
       <h4>🔑 เปลี่ยนรหัส PIN ผู้ดูแล</h4>
-      <div class="hint">ตั้งรหัส PIN 4 หลักสำหรับเข้าโหมดผู้ดูแล (ค่าเริ่มต้น 1234) — บันทึกไว้ในเครื่องนี้</div>
-      <input id="newPin" type="password" inputmode="numeric" maxlength="4" placeholder="PIN ใหม่ (4 หลัก)" autocomplete="off"
-             style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;letter-spacing:8px;text-align:center;outline:none;font-family:monospace" />
-      <input id="newPin2" type="password" inputmode="numeric" maxlength="4" placeholder="ยืนยัน PIN ใหม่" autocomplete="off"
-             style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;letter-spacing:8px;text-align:center;outline:none;font-family:monospace;margin-top:8px" />
-      <div class="act-btns" style="margin-top:10px">
-        <button class="btn btn-primary" id="savePin">💾 บันทึก PIN ใหม่</button>
+      <div class="hint">ตั้งรหัส PIN 4 หลักสำหรับเข้าโหมดผู้ดูแล (ค่าเริ่มต้น 1234) เก็บไว้ในเครื่องนี้</div>
+      <div class="pin-field">
+        <label for="newPin">PIN ใหม่</label>
+        <input id="newPin" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" />
       </div>
+      <div class="pin-field">
+        <label for="newPin2">ยืนยัน PIN ใหม่</label>
+        <input id="newPin2" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" />
+      </div>
+      <button class="btn btn-primary" id="savePin" style="width:100%;margin-top:14px">บันทึก PIN ใหม่</button>
       <div id="pinMsg" style="font-size:12.5px;margin-top:10px;line-height:1.5;font-weight:600;min-height:16px"></div>
     </div>
 

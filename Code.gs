@@ -77,6 +77,14 @@ function buildMap_(headerRow) {
   return map;
 }
 
+/* ★ รันฟังก์ชันนี้จาก Editor 1 ครั้ง เพื่ออนุญาตสิทธิ์ "เชื่อมต่ออินเทอร์เน็ต" (UrlFetchApp)
+ *   แล้วดูผลลัพธ์ที่ View → Logs — ถ้าได้คำอังกฤษกลับมา = AI พร้อมใช้ */
+function testAI() {
+  var r = aiInterpret_('มีดโกน');
+  Logger.log('AI translate result: ' + JSON.stringify(r));
+  return r;
+}
+
 /* ---------- อ่าน + รวมข้อมูล (dedupe by Material, รวม stock หลายที่เก็บ) ---------- */
 function readCatalog_() {
   var sh = dataSheet_();
@@ -366,6 +374,25 @@ function doGet(e) {
     }
     if (action === 'sample') {
       return json_({ ok: true, items: sample_(parseInt(p.n) || 6) });
+    }
+    if (action === 'aidiag') {
+      var pr = PropertiesService.getScriptProperties();
+      var k = pr.getProperty('AI_API_KEY') || pr.getProperty('GROQ_API_KEY');
+      var aurl = pr.getProperty('AI_API_URL') || 'https://api.groq.com/openai/v1/chat/completions';
+      var amodel = pr.getProperty('AI_MODEL') || 'llama-3.1-8b-instant';
+      if (!k) return json_({ ok: true, hasKey: false, note: 'ไม่พบ AI_API_KEY / GROQ_API_KEY ใน Script Properties' });
+      var o = { ok: true, hasKey: true, keyPrefix: String(k).substring(0, 5), model: amodel, url: aurl };
+      try {
+        var rr = UrlFetchApp.fetch(aurl, {
+          method: 'post', contentType: 'application/json',
+          headers: { Authorization: 'Bearer ' + k },
+          payload: JSON.stringify({ model: amodel, temperature: 0, max_tokens: 40, messages: [{ role: 'user', content: 'reply with one english keyword: มีดโกน' }] }),
+          muteHttpExceptions: true
+        });
+        o.httpStatus = rr.getResponseCode();
+        o.body = rr.getContentText().substring(0, 500);
+      } catch (err) { o.fetchError = String((err && err.message) || err); }
+      return json_(o);
     }
     // meta: ใช้ทดสอบการเชื่อมต่อ
     var info = readCatalog_();

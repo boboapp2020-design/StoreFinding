@@ -656,6 +656,18 @@ function doGet(e) {
     if (action === 'sample') {
       return json_({ ok: true, items: sample_(parseInt(p.n) || 6) });
     }
+    if (action === 'all') {
+      // ส่งรายการทั้งหมดแบบกระชับ (array-of-arrays ประหยัดขนาด) ให้แอปโหลดครั้งเดียว → กรองในเครื่องได้ทันที
+      var catAll = readCatalog_().items, out = [];
+      for (var ia = 0; ia < catAll.length; ia++) {
+        var itA = catAll[ia];
+        var imgA = itA.image || findImage_(itA.code);
+        var nmA = [], seenA = {};
+        (itA.locs || []).forEach(function (l) { var x = String(l.name || l.sloc || '').trim(); if (x && !seenA[x] && nmA.length < 4) { seenA[x] = 1; nmA.push(x); } });
+        out.push([itA.code, itA.name, itA.unit, itA.qty, itA.group, imgA || '', nmA]);
+      }
+      return json_({ ok: true, count: out.length, items: out });
+    }
     if (action === 'imgdiag') {
       var fid = imageFolderId_();
       if (!fid) return json_({ ok: true, folderId: '', count: 0, note: 'ยังไม่ได้ตั้งค่า IMAGE_FOLDER_ID ใน Script Properties' });

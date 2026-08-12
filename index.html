@@ -710,12 +710,16 @@ function resultsPanel(items){
 const searchOverlay = document.getElementById('searchOverlay');
 const mSearchInp = document.getElementById('mSearchInp');
 const mResults = document.getElementById('mResults');
-let mItems = [];          // ผลค้นล่าสุด (จากเซิร์ฟเวอร์)
+let mItems = [];          // ผลกรองล่าสุด (ที่กำลังแสดง)
 let mFilter = 'all';      // ตัวกรองสต็อกที่เลือก
-let mDebounce = null, mSeq = 0;
+let mDebounce = null;
+let allCatalog = null;    // รายการทั้งหมด (โหลดครั้งเดียว) → กรองในเครื่องได้ทันที
+let allState = 'idle';    // idle | loading | ready | error
+const M_SHOW_MAX = 60;    // แสดงสูงสุดกี่การ์ด (กันช้าเมื่อผลเยอะ)
 
 document.getElementById('searchBtn').addEventListener('click', ()=>{
   searchOverlay.classList.add('show');
+  loadAllCatalog();       // โหลดข้อมูลทั้งหมดไว้รอ (ครั้งแรกครั้งเดียว)
   renderMResults();
   setTimeout(()=>mSearchInp.focus(), 120);
 });
@@ -735,23 +739,62 @@ document.querySelectorAll('#searchOverlay .fchip').forEach(c=>{
 
 mSearchInp.addEventListener('input', ()=>{
   clearTimeout(mDebounce);
-  const q = mSearchInp.value.trim();
-  if(!q){ mItems = []; renderMResults(); return; }
-  mResults.innerHTML = '<div class="search-hint">🔎 กำลังค้นหา…</div>';
-  mDebounce = setTimeout(()=>runManualSearch(q), 350);   // หน่วง 0.35 วิ กันยิงถี่
+  mDebounce = setTimeout(doManualFilter, 120);   // กรองในเครื่อง เร็วมาก หน่วงสั้น ๆ พอ
 });
 
-function runManualSearch(q){
-  const my = ++mSeq;
-  const attempt = (n)=> apiGet('action=search&q=' + encodeURIComponent(q) +
-      '&qb64=' + encodeURIComponent(b64utf8(q)) + '&limit=30', 30000)
-    .catch(err=>{ if(n<=1) throw err; return new Promise(r=>setTimeout(r,800)).then(()=>attempt(n-1)); });
-  attempt(3).then(res=>{
-    if(my !== mSeq) return;   // มีการพิมพ์ใหม่แล้ว ทิ้งผลเก่า
-    mItems = (res && res.items) ? res.items : [];
-    setMFilter('all');        // ค้นใหม่ทุกครั้ง → รีเซ็ตกลับ "ทั้งหมด" กันตัวกรองค้างบังผล
-    renderMResults();
-  }).catch(()=>{ if(my===mSeq) mResults.innerHTML = '<div class="search-hint">⚠️ เชื่อมต่อช้าหรือไม่ได้<br>ลองพิมพ์ใหม่อีกครั้งครับ</div>'; });
+/* normalize ให้เหมือนฝั่งเซิร์ฟเวอร์ (ตัดช่องว่าง/อักขระคั่น + พิมพ์เล็ก) */
+function normS(s){ return String(s==null?'':s).toLowerCase().replace(/[\s\._\-\/()]/g,''); }
+
+/* โหลดรายการทั้งหมดจากเซิร์ฟเวอร์ครั้งเดียว แล้วแคชไว้ (ทั้งในหน่วยความจำ + localStorage 6 ชม.) */
+async function loadAllCatalog(){
+  if(allCatalog || allState==='loading') return;
+  // ลองใช้แคชในเครื่องก่อน (เปิดครั้งต่อไปไวทันที)
+  try {
+    const raw = localStorage.getItem('catalog_all');
+    if(raw){ const o = JSON.parse(raw); if(o && o.t && (Date.now()-o.t < 6*3600*1000) && o.items){ hydrateCatalog(o.items); allState='ready'; doManualFilter(); } }
+  } catch(e){}
+  if(allCatalog) return;
+  allState='loading'; renderMResults();
+  const attempt = (n)=> apiGet('action=all', 60000).catch(err=>{ if(n<=1) throw err; return new Promise(r=>setTimeout(r,1000)).then(()=>attempt(n-1)); });
+  try {
+    const res = await attempt(3);
+    const items = (res && res.items) ? res.items : [];
+    hydrateCatalog(items); allState='ready';
+    try { localStorage.setItem('catalog_all', JSON.stringify({ t:Date.now(), items:items })); } catch(e){}
+  } catch(e){ allState='error'; }
+  doManualFilter();
+}
+/* แปลงข้อมูลกระชับ [code,name,unit,qty,group,image,locNames] → object + สร้างข้อความค้นหา _s */
+function hydrateCatalog(items){
+  allCatalog = items.map(a=>({
+    code:a[0], name:a[1], unit:a[2], qty:a[3], group:a[4], image:a[5]||'',
+    locs:(a[6]||[]).map(n=>({name:n})),
+    _name: normS(a[1]) + normS(a[4]),   // ชื่อ+หมวด (ค้นทีละคำ)
+    _code: normS(a[0])                  // รหัส (ค้นแยก กันเลขสั้นไปชนรหัส)
+  }));
+}
+/* กรองทันทีในเครื่อง: ทุกคำที่พิมพ์ต้องอยู่ในข้อความค้นหา (พิมพ์เพิ่ม = แคบลงเรื่อย ๆ) */
+function filterAll(q){
+  const qn = normS(q);
+  const words = q.trim().split(/\s+/).map(normS).filter(Boolean);
+  if(!words.length) return [];
+  const codeMode = qn.length >= 4;   // พิมพ์รหัส (ยาว ≥4) → จับที่รหัสด้วย
+  const out = [];
+  for(let i=0;i<allCatalog.length;i++){
+    const it = allCatalog[i];
+    let nameOk = true;
+    for(let w=0;w<words.length;w++){ if(it._name.indexOf(words[w])===-1){ nameOk=false; break; } }
+    if(nameOk || (codeMode && it._code.indexOf(qn)!==-1)) out.push(it);
+  }
+  return out;
+}
+/* เรียกตอนพิมพ์: กรองจากข้อมูลที่โหลดไว้ (ถ้ายังไม่พร้อม → โหลดก่อน) */
+function doManualFilter(){
+  if(allState==='loading' || allState==='idle'){ if(allState==='idle') loadAllCatalog(); renderMResults(); return; }
+  if(allState==='error'){ mItems=[]; renderMResults(); return; }
+  const q = mSearchInp.value.trim();
+  mItems = q ? filterAll(q) : [];
+  renderMResults();
 }
 
 /* ตั้งตัวกรองที่เลือก + ไฮไลต์ปุ่มให้ตรง */
@@ -773,17 +816,26 @@ function updateFilterChips(){
 
 function renderMResults(){
   updateFilterChips();
+  // ยังไม่มีข้อมูลในเครื่อง → บอกสถานะ
+  if(!allCatalog){
+    mResults.innerHTML = (allState==='error')
+      ? '<div class="search-hint">⚠️ โหลดข้อมูลไม่สำเร็จ<br>ตรวจอินเทอร์เน็ต แล้วปิด-เปิดหน้าค้นหาใหม่ครับ</div>'
+      : '<div class="search-hint">⏳ กำลังเตรียมข้อมูล… รอสักครู่<br><small>(โหลดครั้งแรกครั้งเดียว หลังจากนี้ค้นได้ทันที)</small></div>';
+    return;
+  }
   const typed = mSearchInp.value.trim();
-  if(!typed){ mResults.innerHTML = '<div class="search-hint">🔍 พิมพ์ชื่อ หรือ รหัสพัสดุ เพื่อค้นหา<br>แล้วเลือกตัวกรองสถานะสต็อกได้</div>'; return; }
+  if(!typed){ mResults.innerHTML = '<div class="search-hint">🔍 พิมพ์ชื่อ หรือ รหัสพัสดุ<br>รายการจะแคบลงทันทีขณะพิมพ์</div>'; return; }
   let list = mItems;
   if(mFilter !== 'all') list = list.filter(it=> stockBucket(it.qty) === mFilter);
   if(!list.length){
     mResults.innerHTML = mItems.length
-      ? '<div class="search-hint">ไม่มีรายการที่ตรงกับตัวกรองนี้<br>ลองเลือก “ทั้งหมด” ดูครับ</div>'
+      ? '<div class="search-hint">ไม่มีรายการในกลุ่มนี้<br>ลองเลือก “ทั้งหมด” ดูครับ</div>'
       : '<div class="search-hint">ไม่พบพัสดุที่ตรงกับคำค้นนี้ 😕<br>ลองใช้คำอื่น หรือพิมพ์สั้นลงครับ</div>';
     return;
   }
-  mResults.innerHTML = list.map(cardHTML).join('');
+  let html = list.slice(0, M_SHOW_MAX).map(cardHTML).join('');
+  if(list.length > M_SHOW_MAX) html += '<div class="search-hint">…และอีก ' + (list.length - M_SHOW_MAX) + ' รายการ — พิมพ์เพิ่มเพื่อแคบลงครับ</div>';
+  mResults.innerHTML = html;
 }
 
 function respond(query){

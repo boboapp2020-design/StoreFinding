@@ -1,0 +1,884 @@
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#dbe9ff" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="คลังพัสดุ" />
+<title>ผู้ช่วยคลังพัสดุ</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" href="icon-192.png?v=5" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=5" />
+<!-- SheetJS สำหรับอ่านไฟล์ Excel (.xlsx) — รวมไว้ในตัว ใช้งานออฟไลน์ได้ -->
+<script src="xlsx.full.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --pri: #2563eb; --pri-l: #4d9bff; --pri-d: #1d4ed8;
+    --ink: #12346b; --text: #1e2b45; --muted: #6b86a8; --line: #dbe7ff;
+  }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Sarabun", "Noto Sans Thai", Roboto, sans-serif;
+    color: var(--text);
+    overscroll-behavior: none;
+  }
+  body {
+    display: flex; flex-direction: column; max-width: 520px; margin: 0 auto; height: 100dvh;
+    position: relative; background: linear-gradient(180deg, #eaf3ff 0%, #dbe9ff 100%);
+  }
+  /* พื้นหลังลายจุดวงจร */
+  body::before {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(79,155,255,.13) 1.3px, transparent 1.3px);
+    background-size: 22px 22px;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    position: relative; z-index: 2;
+    margin: calc(10px + env(safe-area-inset-top)) 10px 4px;
+    border-radius: 22px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, rgba(220,236,255,.92), rgba(193,222,255,.8));
+    border: 1px solid rgba(120,170,255,.55);
+    box-shadow: 0 10px 26px rgba(59,130,246,.2);
+    backdrop-filter: blur(6px);
+  }
+  .avatar {
+    width: 56px; height: 56px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 0 20px rgba(77,155,255,.65);
+    background: #dbeafe;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .h-title { font-size: 19px; font-weight: 800; color: var(--ink); line-height: 1.15; letter-spacing: .3px; }
+  .h-sub { font-size: 12px; color: #3f6aa8; display: flex; align-items: center; gap: 5px; margin-top: 3px; font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 rgba(34,197,94,.7); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)} 70%{box-shadow:0 0 0 6px rgba(34,197,94,0)} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0)} }
+  .h-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .ai-chip {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; font-weight: 800; font-size: 15px;
+    display: grid; place-items: center; letter-spacing: .5px;
+    box-shadow: 0 0 16px rgba(59,130,246,.6), inset 0 0 0 2px rgba(255,255,255,.3);
+  }
+  .hbtn {
+    width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+    background: rgba(255,255,255,.7); border: 1px solid rgba(120,170,255,.55); color: var(--pri-d);
+    font-size: 16px; display: grid; place-items: center; cursor: pointer; transition: .15s; backdrop-filter: blur(4px);
+  }
+  .hbtn:active { transform: scale(.9); }
+
+  /* ---------- Chat ---------- */
+  #chat {
+    flex: 1; overflow-y: auto; padding: 14px 12px 8px; position: relative; z-index: 1;
+    display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth;
+  }
+  .row { display: flex; gap: 8px; align-items: flex-end; max-width: 90%; }
+  .row.bot { align-self: flex-start; }
+  .row.user { align-self: flex-end; flex-direction: row-reverse; }
+  .mini-av {
+    width: 38px; height: 38px; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: #dbeafe;
+    box-shadow: 0 0 0 2px #fff, 0 3px 8px rgba(59,130,246,.3);
+  }
+  .mini-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .bubble {
+    padding: 12px 15px; border-radius: 20px; font-size: 15px; line-height: 1.55; word-break: break-word;
+    background: #fff; color: #1e2b45; border: 1px solid rgba(120,170,255,.16);
+    box-shadow: 0 5px 16px rgba(59,130,246,.1);
+  }
+  .bubble b { color: var(--pri); font-weight: 700; }
+  .bot .bubble { border-bottom-left-radius: 6px; }
+  .user .bubble {
+    background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none;
+    border-bottom-right-radius: 6px; box-shadow: 0 5px 16px rgba(37,99,235,.35);
+  }
+  .user .bubble b { color: #dbeafe; }
+  .time { display: block; text-align: right; font-size: 11px; color: #9db2d4; margin-top: 6px; }
+  .user .time { color: rgba(255,255,255,.8); }
+  .time .chk { color: #7fd0ff; letter-spacing: -3px; font-weight: 900; margin-left: 3px; }
+  .user .time .chk { color: #bfe0ff; }
+
+  /* ---------- Suggestion panel + cards ---------- */
+  .panel-row { width: 100%; position: relative; z-index: 1; }
+  .suggest {
+    background: #fff; border-radius: 22px; padding: 16px;
+    border: 1px solid rgba(120,170,255,.2); box-shadow: 0 8px 22px rgba(59,130,246,.13);
+  }
+  .suggest-head { display: flex; align-items: center; gap: 11px; font-weight: 700; color: #33507a; font-size: 14px; margin-bottom: 13px; }
+  .bulb {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: inline-grid; place-items: center;
+    background: linear-gradient(135deg, #4d9bff, #2563eb); box-shadow: 0 4px 11px rgba(37,99,235,.4);
+  }
+  .bulb svg { width: 19px; height: 19px; stroke: #fff; fill: none; stroke-width: 1.8; }
+  .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chip {
+    display: flex; align-items: center; gap: 10px; text-align: left; font-family: inherit; cursor: pointer;
+    background: #f4f8ff; border: 1.5px solid #e4edff; border-radius: 15px; padding: 11px 12px;
+    box-shadow: 0 2px 7px rgba(59,130,246,.06); transition: .15s;
+  }
+  .chip:active { transform: scale(.97); background: #e8f1ff; }
+  .chip.wide { grid-column: 1 / -1; }
+  .chip-ic {
+    width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center;
+    background: #e8f1ff; color: var(--pri);
+  }
+  .chip-ic svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .chip-tx { flex: 1; font-size: 13.5px; font-weight: 600; color: #26364f; line-height: 1.25; }
+  .chip-ch { color: #9db8e0; font-size: 19px; font-weight: 700; flex-shrink: 0; }
+
+  /* ---------- Result card ---------- */
+  .card { background: #f4f8ff; border: 1.5px solid #dbe7ff; border-radius: 16px; padding: 14px; margin-top: 2px; }
+  .card .name { font-weight: 800; font-size: 15px; margin-bottom: 11px; display: flex; align-items: center; gap: 9px; color: var(--ink); }
+  .card-ic { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; background: #e5eeff; color: var(--pri); }
+  .card-ic svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .code-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .code {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 17px; font-weight: 800; letter-spacing: .5px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; padding: 5px 13px; border-radius: 9px;
+    box-shadow: 0 3px 9px rgba(37,99,235,.35);
+  }
+  .copy-btn {
+    background: #fff; color: var(--pri); font-weight: 700; border: 1.5px solid var(--pri); border-radius: 9px;
+    padding: 6px 11px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .copy-btn:active { transform: scale(.94); }
+  .meta { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .stock-pill { display: inline-block; padding: 1px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
+  .in { background:#dcfce7; color:#15803d; } .low { background:#fef9c3; color:#a16207; } .out { background:#fee2e2; color:#b91c1c; }
+
+  /* ---------- Typing ---------- */
+  .typing .bubble { padding: 14px 17px; }
+  .typing span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #7aa8f0; margin: 0 2px; animation: blink 1.2s infinite; }
+  .typing span:nth-child(2){ animation-delay:.2s } .typing span:nth-child(3){ animation-delay:.4s }
+  @keyframes blink { 0%,60%,100%{opacity:.3; transform:translateY(0)} 30%{opacity:1; transform:translateY(-3px)} }
+
+  /* ---------- Input bar ---------- */
+  footer {
+    position: relative; z-index: 2;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.86); border-top: 1px solid rgba(120,170,255,.28);
+    display: flex; gap: 8px; align-items: center; backdrop-filter: blur(8px);
+  }
+  #q {
+    flex: 1; border: 1.5px solid #dbe7ff; border-radius: 24px; padding: 12px 16px; font-size: 15px;
+    outline: none; font-family: inherit; background: #eef4ff; transition: .15s;
+  }
+  #q:focus { border-color: var(--pri-l); background: #fff; }
+  #send {
+    width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0;
+    background: linear-gradient(135deg, #4d9bff, #2563eb); box-shadow: 0 5px 14px rgba(37,99,235,.45);
+    display: grid; place-items: center; transition: .15s;
+  }
+  #send:active { transform: scale(.9); }
+  #send svg { width: 23px; height: 23px; }
+
+  .fade { animation: fade .3s ease; }
+  @keyframes fade { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+
+  /* ---------- Modal / Overlay ---------- */
+  .overlay {
+    position: absolute; inset: 0; background: rgba(18,52,107,.45);
+    backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 20px; width: 100%; max-width: 340px; padding: 22px; box-shadow: 0 20px 50px rgba(18,52,107,.35); animation: pop .25s ease; }
+  @keyframes pop { from{opacity:0; transform:scale(.9)} to{opacity:1; transform:scale(1)} }
+  .modal h3 { font-size: 18px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; color: var(--ink); }
+  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .pin-input { width: 100%; text-align: center; letter-spacing: 12px; font-size: 26px; font-weight: 800; border: 2px solid var(--line); border-radius: 12px; padding: 12px; outline: none; font-family: monospace; }
+  .pin-input:focus { border-color: var(--pri); }
+  .pin-err { color: #dc2626; font-size: 13px; margin-top: 8px; min-height: 18px; text-align: center; font-weight: 600; }
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+  .btn { flex: 1; border: none; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; transition: .15s; }
+  .btn:active { transform: scale(.96); }
+  .btn-primary { background: var(--pri); color: #fff; }
+  .btn-ghost { background: #eef2f9; color: var(--text); }
+
+  /* ช่องตั้ง PIN ใหม่ (โหมดแอดมิน) */
+  .pin-field { margin-top: 12px; }
+  .pin-field label { display: block; font-size: 12.5px; font-weight: 700; color: #33507a; margin-bottom: 6px; }
+  .pin-set { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 13px 14px; font-size: 22px; font-weight: 800; letter-spacing: 10px; text-align: center; outline: none; font-family: monospace; background: #f4f8ff; transition: .15s; }
+  .pin-set::placeholder { letter-spacing: 6px; color: #c3d3ea; font-size: 20px; }
+  .pin-set:focus { border-color: var(--pri); background: #fff; }
+
+  /* ---------- หน้าต้อนรับ (Splash) ---------- */
+  #splash {
+    position: fixed; inset: 0; z-index: 200; padding: 24px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(160deg, #4d9bff 0%, #2563eb 45%, #12346b 100%);
+    transition: opacity .5s ease, visibility .5s;
+  }
+  #splash::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.10) 1.3px, transparent 1.3px); background-size: 24px 24px;
+  }
+  #splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+  .splash-inner { position: relative; color: #fff; max-width: 340px; }
+  .splash-avatar {
+    width: 168px; height: 168px; border-radius: 50%; overflow: hidden; margin: 0 auto 22px; background: #dbeafe;
+    border: 4px solid rgba(255,255,255,.55);
+    box-shadow: 0 0 44px rgba(255,255,255,.45), 0 14px 34px rgba(0,0,0,.28);
+    animation: splashPop .6s cubic-bezier(.2,.8,.3,1.25);
+  }
+  .splash-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  @keyframes splashPop { from { transform: scale(.55); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .splash-title { font-size: 27px; font-weight: 800; letter-spacing: .5px; animation: fade .7s ease .1s both; }
+  .splash-sub { font-size: 17px; font-weight: 700; margin-top: 8px; line-height: 1.5; animation: fade .7s ease .25s both; }
+  .splash-sub small { display: block; font-size: 13.5px; font-weight: 400; opacity: .9; margin-top: 8px; }
+  .splash-btn {
+    margin-top: 30px; border: none; background: #fff; color: #1d4ed8; font-weight: 800; font-size: 16px;
+    padding: 13px 36px; border-radius: 30px; cursor: pointer; box-shadow: 0 8px 22px rgba(0,0,0,.22);
+    transition: .15s; animation: fade .7s ease .4s both;
+  }
+  .splash-btn:active { transform: scale(.94); }
+
+  /* ---------- Admin panel ---------- */
+  #admin { position: absolute; inset: 0; background: linear-gradient(180deg,#eaf3ff,#dbe9ff); z-index: 60; display: none; flex-direction: column; }
+  #admin.show { display: flex; }
+  .adm-head {
+    background: linear-gradient(135deg, #1d4ed8, #12346b); color: #fff;
+    padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top)); display: flex; align-items: center; gap: 12px;
+  }
+  .adm-head .t { font-size: 17px; font-weight: 700; }
+  .adm-head .s { font-size: 12px; opacity: .82; }
+  .adm-back { background: rgba(255,255,255,.18); border: none; color: #fff; border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; margin-left: auto; }
+  .adm-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .panel { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 14px rgba(59,130,246,.1); }
+  .panel h4 { font-size: 15px; margin-bottom: 4px; display: flex; align-items: center; gap: 7px; color: var(--ink); }
+  .panel .hint { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+  .mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+  .mode-toggle label { flex: 1; text-align: center; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: .15s; }
+  .mode-toggle input { display: none; }
+  .mode-toggle input:checked + label { background: var(--pri); color: #fff; border-color: var(--pri); }
+  .upload-zone { border: 2px dashed var(--pri-l); border-radius: 12px; padding: 22px 14px; text-align: center; background: #eef5ff; cursor: pointer; transition: .15s; }
+  .upload-zone:active { background: #dbe9ff; }
+  .upload-zone .ico { font-size: 34px; }
+  .upload-zone .big { font-weight: 700; font-size: 15px; margin-top: 6px; color: var(--ink); }
+  .upload-zone .sm { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .act-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .act-btns .btn { flex: 1; min-width: 130px; font-size: 13.5px; padding: 11px; }
+  .btn-out { background: #fff; color: var(--pri); border: 1.5px solid var(--pri); }
+  .import-log { font-size: 13px; line-height: 1.7; margin-top: 12px; padding: 12px; border-radius: 10px; display: none; }
+  .import-log.ok { display: block; background: #dcfce7; color: #14532d; }
+  .import-log.warn { display: block; background: #fef9c3; color: #713f12; }
+  .import-log.bad { display: block; background: #fee2e2; color: #7f1d1d; }
+  .confirm-info { background:#fff7ed; border:1.5px solid #fed7aa; border-radius:12px; padding:12px 14px; font-size:13.5px; line-height:1.7; color:#7c2d12; margin:12px 0; }
+  .inv-count { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .inv-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eef3fb; }
+  .inv-item:last-child { border-bottom: none; }
+  .inv-code { font-family: monospace; font-weight: 700; font-size: 12.5px; background: #eaf2ff; padding: 3px 7px; border-radius: 6px; color: var(--pri-d); flex-shrink: 0; }
+  .inv-name { flex: 1; font-size: 13.5px; line-height: 1.3; }
+  .inv-name small { color: var(--muted); display: block; font-size: 11.5px; }
+  .inv-qty-edit { width: 66px; text-align: center; border: 1.5px solid var(--line); border-radius: 8px; padding: 7px 4px; font-size: 14px; font-weight: 700; font-family: inherit; outline: none; }
+  .inv-qty-edit:focus { border-color: var(--pri); }
+  .inv-unit { font-size: 11px; color: var(--muted); width: 34px; text-align: left; flex-shrink: 0; }
+</style>
+
+<!-- หน้าต้อนรับ -->
+<div id="splash">
+  <div class="splash-inner">
+    <div class="splash-avatar"><img src="na.png" alt="ผู้ช่วยคลังพัสดุ" /></div>
+    <div class="splash-title">ยินดีต้อนรับ 👋</div>
+    <div class="splash-sub">ผู้ช่วยคลังพัสดุ<small>ค้นหารหัสพัสดุด้วยชื่อสินค้า — แค่พิมพ์ ผมช่วยหาให้เอง</small></div>
+  </div>
+</div>
+
+<header>
+  <div class="avatar"><img src="na.png" alt="ผู้ช่วยคลังพัสดุ" /></div>
+  <div>
+    <div class="h-title">ผู้ช่วยคลังพัสดุ</div>
+    <div class="h-sub"><span class="dot"></span> ออนไลน์ · ค้นหารหัสพัสดุ</div>
+  </div>
+  <div class="h-right">
+    <div class="ai-chip">AI</div>
+    <button class="hbtn" id="installBtn" title="ติดตั้งแอป" style="display:none">⬇️</button>
+    <button class="hbtn" id="gearBtn" title="โหมดผู้ดูแล">⚙️</button>
+  </div>
+</header>
+
+<div id="chat"></div>
+
+<footer>
+  <!-- ช่องหลอก: ดูด autofill รหัสผ่านที่ Chrome บันทึกไว้ ไม่ให้มาลงช่องค้นหา -->
+  <input type="text" name="username" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+  <input type="password" name="password" autocomplete="current-password" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+  <input id="q" type="search" placeholder="พิมพ์ชื่อสินค้า เช่น สายไฟ, ปากกา..."
+         readonly onfocus="this.removeAttribute('readonly')"
+         autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+         name="q_search_nofill" data-lpignore="true" data-1p-ignore data-form-type="other" />
+  <button id="send" title="ส่ง">
+    <svg viewBox="0 0 24 24"><path fill="#fff" d="M21.9 3.06 2.7 10.62c-.94.37-.9 1.72.06 2.03l4.98 1.6 1.94 5.98c.3.9 1.46 1.1 2.03.32l2.53-2.42 4.7 3.44c.63.46 1.53.12 1.7-.65L23.02 4.2c.2-.9-.68-1.5-1.12-1.14z"/></svg>
+  </button>
+</footer>
+
+<!-- PIN modal -->
+<div class="overlay" id="pinOverlay">
+  <div class="modal">
+    <h3>🔒 โหมดผู้ดูแล</h3>
+    <p>กรุณาใส่รหัส PIN 4 หลักเพื่อเข้าจัดการข้อมูลคลัง</p>
+    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="one-time-code" name="pin_otp" />
+    <div class="pin-err" id="pinErr"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="pinCancel">ยกเลิก</button>
+      <button class="btn btn-primary" id="pinOk">เข้าสู่ระบบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin panel -->
+<div id="admin">
+  <div class="adm-head">
+    <div>
+      <div class="t">🛠️ จัดการคลังพัสดุ</div>
+      <div class="s">โหมดผู้ดูแล (Admin)</div>
+    </div>
+    <button class="adm-back" id="admBack">← กลับ</button>
+  </div>
+  <div class="adm-body">
+
+    <div class="panel">
+      <h4>📤 อัปเดตข้อมูลจากไฟล์</h4>
+      <div class="hint">อัปโหลดไฟล์ <b>Excel / CSV</b> — ระบบจะ <b>ลบข้อมูลเดิมทั้งหมด แล้วแทนที่ด้วยไฟล์ใหม่</b><br>จับคู่คอลัมน์อัตโนมัติจาก <b>ชื่อหัวคอลัมน์</b> (แต่ละไฟล์คอลัมน์ต่างกันได้)</div>
+
+      <div class="upload-zone" id="uploadZone">
+        <div class="ico">📁</div>
+        <div class="big">แตะเพื่อเลือกไฟล์</div>
+        <div class="sm">รองรับ .xlsx, .xls, .csv</div>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+
+      <div id="uploadConfirm" style="display:none">
+        <div class="confirm-info" id="confirmInfo"></div>
+        <div class="act-btns">
+          <button class="btn btn-primary" id="confirmUpload">✅ อัปเดตข้อมูล</button>
+          <button class="btn btn-out" id="cancelUpload" style="color:#dc2626;border-color:#fecaca">✖ ยกเลิก</button>
+        </div>
+      </div>
+
+      <div class="import-log" id="importLog"></div>
+    </div>
+
+    <div class="panel">
+      <h4>🔑 เปลี่ยนรหัส PIN ผู้ดูแล</h4>
+      <div class="hint">ตั้งรหัส PIN 4 หลักสำหรับเข้าโหมดผู้ดูแล (ค่าเริ่มต้น 1234) เก็บไว้ในเครื่องนี้</div>
+      <div class="pin-field">
+        <label for="newPin">PIN ใหม่</label>
+        <input id="newPin" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="one-time-code" name="newpin_otp" />
+      </div>
+      <div class="pin-field">
+        <label for="newPin2">ยืนยัน PIN ใหม่</label>
+        <input id="newPin2" class="pin-set" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="one-time-code" name="newpin2_otp" />
+      </div>
+      <button class="btn btn-primary" id="savePin" style="width:100%;margin-top:14px">บันทึก PIN ใหม่</button>
+      <div id="pinMsg" style="font-size:12.5px;margin-top:10px;line-height:1.5;font-weight:600;min-height:16px"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Popup แจ้งอัปเดตเสร็จ -->
+<div class="overlay" id="donePopup">
+  <div class="modal" style="text-align:center">
+    <div style="font-size:54px;line-height:1">✅</div>
+    <h3 style="justify-content:center;margin-top:6px">อัปเดตข้อมูลเสร็จแล้ว</h3>
+    <p id="doneMsg" style="text-align:center"></p>
+    <div class="btn-row"><button class="btn btn-primary" id="doneOk">กลับหน้าแรก</button></div>
+  </div>
+</div>
+
+<script>
+/* ไม่มีข้อมูลตัวอย่างในเครื่อง — แอปอิงข้อมูลจริงจาก Google Sheet (database) ทั้งหมด */
+const DEFAULT_DB = [];
+
+const PIN_KEY = "admin_pin";
+let ADMIN_PIN = localStorage.getItem(PIN_KEY) || "1234";   // ค่าเริ่มต้น 1234 · เปลี่ยนได้ในโหมดผู้ดูแล
+const STORE_KEY = "warehouse_db_v1";
+
+/* โหลด/บันทึกข้อมูล (localStorage เพื่อให้ข้อมูลอยู่ถาวร) */
+let DB = loadDB();
+function loadDB(){
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ const d = JSON.parse(raw); if(Array.isArray(d) && d.length) return d; }
+  } catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_DB));
+}
+function saveDB(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(DB)); } catch(e){} }
+
+/* ================= เชื่อมต่อ Google Sheet ================= */
+const API_KEY = "sheet_api_url";
+/* URL ฐานข้อมูลจริง (Google Sheet + Apps Script) — ฝังไว้ให้เชื่อมต่ออัตโนมัติ */
+const DEFAULT_SHEET_API = "https://script.google.com/macros/s/AKfycbz8frSZtZ4QI1IUZYrreykuP0XjFYVDsJFO3g2N-UhlcbTM_0WioOVDEAySJFb24UJS/exec";
+/* ใช้ URL ที่ฝังไว้เสมอ + ล้างค่าเก่าที่อาจค้างใน localStorage (กันแอปชี้ URL เก่า) */
+let SHEET_API = DEFAULT_SHEET_API;
+try { localStorage.removeItem(API_KEY); } catch(e){}
+
+/* Write Token — แอดมินกรอกครั้งเดียว เก็บในเครื่องแอดมินเอง (ไม่ฝังในโค้ดสาธารณะ) */
+const TOKEN_KEY = "write_token";
+let WRITE_TOKEN = (localStorage.getItem(TOKEN_KEY) || "").trim();
+
+function itemToSheet(it){ return { code:it.code, name:it.name, cat:it.cat, unit:it.unit, qty:it.qty, kw:(it.kw||[]).join('|') }; }
+function itemFromSheet(r){
+  return {
+    code:String(r.code||'').trim(),
+    name:String(r.name||'').trim(),
+    cat:String(r.cat||'ทั่วไป').trim(),
+    unit:String(r.unit||'หน่วย').trim(),
+    qty: parseInt(r.qty)||0,
+    kw: parseKw(r.kw, r.name)
+  };
+}
+async function pullFromSheet(){
+  if(!SHEET_API) return { ok:false, reason:'no-url' };
+  const url = SHEET_API + (SHEET_API.includes('?')?'&':'?') + 't=' + Date.now();
+  const res = await fetch(url, { method:'GET' });
+  const data = await res.json();
+  if(data && data.ok && Array.isArray(data.items)){
+    if(data.items.length){ DB = data.items.map(itemFromSheet); saveDB(); }
+    return { ok:true, count: data.items.length };
+  }
+  return { ok:false, reason:'bad-data' };
+}
+async function pushToSheet(){
+  if(!SHEET_API) return { ok:false, reason:'no-url' };
+  const res = await fetch(SHEET_API, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action:'replaceAll', token: WRITE_TOKEN, items: DB.map(itemToSheet) })
+  });
+  return await res.json();
+}
+/* ซิงก์ขึ้น Sheet แล้วแสดงสถานะในกล่อง log */
+function syncPush(){
+  if(!SHEET_API) return;
+  const el = document.getElementById('importLog');
+  const base = el.innerHTML;
+  el.className = 'import-log ok';
+  el.innerHTML = base + '<br>🔄 กำลังซิงก์ขึ้น Google Sheet...';
+  pushToSheet().then(r=>{
+    el.innerHTML = base + '<br>' + ((r&&r.ok)?'☁️ ซิงก์ขึ้น Google Sheet แล้ว ('+r.count+' รายการ)':'⚠️ ซิงก์ Sheet ไม่สำเร็จ — ตรวจ URL/สิทธิ์การเข้าถึง');
+  }).catch(()=>{ el.innerHTML = base + '<br>⚠️ ซิงก์ Sheet ไม่สำเร็จ (อาจไม่มีอินเทอร์เน็ต)'; });
+}
+
+/* ================= ไอคอนสินค้า ================= */
+const ICONS = {
+  box:  '<svg viewBox="0 0 24 24"><path d="M21 8.5 12 3 3 8.5l9 5 9-5Z"/><path d="M3 8.5v7l9 5 9-5v-7M12 13.5v7"/></svg>',
+  doc:  '<svg viewBox="0 0 24 24"><path d="M14 2H6v20h12V6l-4-4Z"/><path d="M14 2v4h4M9 12h6M9 16h6"/></svg>',
+  cable:'<svg viewBox="0 0 24 24"><path d="M4 21c3.5 0 3.5-4 8-4s4.5 4 8 4"/><path d="M6 3v3M10 3v3M5.5 6h5v3a2.5 2.5 0 0 1-5 0Z"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.2.9 1.9v.2h5.2v-.2c0-.7.3-1.4.9-1.9A6 6 0 0 0 12 3Z"/></svg>',
+  glove:'<svg viewBox="0 0 24 24"><path d="M7 12V7a1.4 1.4 0 0 1 2.8 0v3.5M9.8 10V5a1.4 1.4 0 0 1 2.8 0v5M12.6 10.5V6.5a1.4 1.4 0 0 1 2.8 0V14a6 6 0 0 1-6 6 5.5 5.5 0 0 1-4.7-2.7l-1.6-2.7a1.5 1.5 0 0 1 2.5-1.7L7 14"/></svg>',
+  helmet:'<svg viewBox="0 0 24 24"><path d="M3 17a9 9 0 0 1 18 0"/><path d="M2 17h20v2H2zM10 8.2A5 5 0 0 1 14 8"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24"><path d="M9 3h6l3 5-3 5H9L6 8Z"/><circle cx="12" cy="8" r="1.8"/><path d="M12 13v8"/></svg>',
+  tape: '<svg viewBox="0 0 24 24"><circle cx="11" cy="12" r="7.5"/><circle cx="11" cy="12" r="2.8"/><path d="M18 12h4v4H9"/></svg>',
+  spray:'<svg viewBox="0 0 24 24"><path d="M8 9h6v12H8zM9 9V4h4M10.5 3h1.5"/><path d="M17 5v.01M17 8v.01M20 6.5v.01"/></svg>',
+  battery:'<svg viewBox="0 0 24 24"><rect x="2" y="8" width="16" height="9" rx="2"/><path d="M18 11h3v3h-3M7 6v2M12 6v2"/></svg>',
+  pen:  '<svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1ZM14 7l3 3"/></svg>'
+};
+function iconFor(it){
+  const s = ((it.cat||it.group||'') + ' ' + (it.name||'') + ' ' + (it.kw||[]).join(' ')).toLowerCase();
+  let k = 'box';
+  if(/กระดาษ|paper|เอกสาร/.test(s)) k='doc';
+  else if(/สายไฟ|สายทองแดง|wire|cable|thw/.test(s)) k='cable';
+  else if(/หลอด|led|bulb|lamp/.test(s)) k='bulb';
+  else if(/ถุงมือ|glove/.test(s)) k='glove';
+  else if(/หมวก|helmet/.test(s)) k='helmet';
+  else if(/น็อต|นอต|สกรู|bolt|screw|ฮาร์ดแวร์/.test(s)) k='bolt';
+  else if(/เทป|tape/.test(s)) k='tape';
+  else if(/น้ำมัน|wd|สเปรย์|เคมี|lubric/.test(s)) k='spray';
+  else if(/แบต|ถ่าน|battery/.test(s)) k='battery';
+  else if(/ปากกา|pen/.test(s)) k='pen';
+  return ICONS[k];
+}
+const BULB_ICON = '<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.2.9 1.9v.2h5.2v-.2c0-.7.3-1.4.9-1.9A6 6 0 0 0 12 3Z"/></svg>';
+
+/* ================= ค้นหา + เดาคำ (fuzzy) ================= */
+function normalize(s){ return String(s==null?"":s).toLowerCase().replace(/[\s\-\._]/g,"").trim(); }
+
+function lev(a,b){
+  a=normalize(a); b=normalize(b);
+  const m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);
+  for(let j=0;j<=n;j++) d[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+    const c=a[i-1]===b[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+c);
+  }
+  return d[m][n];
+}
+function scoreItem(query, item){
+  const q = normalize(query);
+  if(!q) return 0;
+  let best = 0;
+  const targets = [item.name, item.code, ...(item.kw||[])];
+  for(const t of targets){
+    const nt = normalize(t);
+    if(!nt) continue;
+    let s = 0;
+    if(nt === q) s = 100;
+    else if(nt.includes(q) || q.includes(nt)) s = 80 - Math.abs(nt.length-q.length);
+    else {
+      const dist = lev(q, nt);
+      const maxLen = Math.max(q.length, nt.length);
+      const sim = 1 - dist/maxLen;
+      if(sim >= 0.5) s = Math.round(sim * 70);
+    }
+    if(s > best) best = s;
+  }
+  return best;
+}
+function search(query){
+  return DB.map(it=>({ it, score: scoreItem(query,it) }))
+           .filter(r=>r.score > 0)
+           .sort((a,b)=>b.score-a.score);
+}
+
+/* ================= UI แชท ================= */
+const chat = document.getElementById('chat');
+const input = document.getElementById('q');
+const sendBtn = document.getElementById('send');
+
+function scrollDown(){ chat.scrollTop = chat.scrollHeight; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function nowHM(){ const d=new Date(); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+const AVATAR = '<div class="mini-av"><img src="na.png" alt=""></div>';
+
+function addUser(text){
+  const row = document.createElement('div');
+  row.className = 'row user fade';
+  const b = document.createElement('div');
+  b.className = 'bubble';
+  b.textContent = text;
+  b.insertAdjacentHTML('beforeend', `<span class="time">${nowHM()}</span>`);
+  row.appendChild(b);
+  chat.appendChild(row); scrollDown();
+}
+function botRow(html, withTime){
+  const row = document.createElement('div');
+  row.className = 'row bot fade';
+  const time = withTime ? `<span class="time">${nowHM()} <b class="chk">✓✓</b></span>` : '';
+  row.innerHTML = `${AVATAR}<div class="bubble">${html}${time}</div>`;
+  chat.appendChild(row); scrollDown();
+  return row;
+}
+function botPanel(html){
+  const row = document.createElement('div');
+  row.className = 'panel-row fade';
+  row.innerHTML = `<div class="suggest">${html}</div>`;
+  chat.appendChild(row); scrollDown();
+  return row;
+}
+function typing(){
+  const row = document.createElement('div');
+  row.className = 'row bot typing fade';
+  row.innerHTML = `${AVATAR}<div class="bubble"><span></span><span></span><span></span></div>`;
+  chat.appendChild(row); scrollDown();
+  return row;
+}
+function stockPill(qty){
+  if(qty<=0) return `<span class="stock-pill out">หมดสต็อก</span>`;
+  if(qty<=20) return `<span class="stock-pill low">เหลือน้อย (${qty})</span>`;
+  return `<span class="stock-pill in">พร้อมเบิก (${qty})</span>`;
+}
+function cardHTML(it){
+  const cat = it.cat || it.group || '';
+  const catLine = cat ? `<b>หมวดหมู่:</b> ${esc(cat)} &nbsp;·&nbsp; ` : '';
+  const locNames = [...new Set((it.locs||[]).map(l=>String(l.name||l.sloc||'').trim()).filter(Boolean))];
+  const locLine = locNames.length ? `<br><b>ที่จัดเก็บ:</b> ${esc(locNames.join(', '))}` : '';
+  const plantLine = it.plantName ? `<br><b>โรงงาน:</b> ${esc(it.plantName)}` : '';
+  return `<div class="card">
+    <div class="name"><span class="card-ic">${iconFor(it)}</span> ${esc(it.name)}</div>
+    <div class="code-line">
+      <span>รหัสพัสดุ:</span>
+      <span class="code">${esc(it.code)}</span>
+      <button class="copy-btn" onclick="copyCode('${esc(it.code)}',this)">📋 คัดลอก</button>
+    </div>
+    <div class="meta">
+      ${catLine}<b>หน่วยนับ:</b> ${esc(it.unit||'-')}<br>
+      <b>คงเหลือ:</b> ${stockPill(it.qty)}${locLine}${plantLine}
+    </div>
+  </div>`;
+}
+window.copyCode = function(code, btn){
+  navigator.clipboard?.writeText(code);
+  const old = btn.innerHTML;
+  btn.innerHTML = "✔ คัดลอกแล้ว";
+  setTimeout(()=>btn.innerHTML=old, 1400);
+};
+function chipsHTML(items){
+  return `<div class="chips">` + items.map(it=>{
+    const wide = it.name.length > 20 ? ' wide' : '';
+    return `<button class="chip${wide}" onclick="ask('${esc(it.name).replace(/'/g,"\\'")}')">
+      <span class="chip-ic">${iconFor(it)}</span>
+      <span class="chip-tx">${esc(it.name)}</span>
+      <span class="chip-ch">›</span>
+    </button>`;
+  }).join('') + `</div>`;
+}
+function suggestPanel(headText, items){
+  botPanel(`<div class="suggest-head"><span class="bulb">${BULB_ICON}</span> ${headText}</div>` + chipsHTML(items));
+}
+/* ค้นหาผ่าน Google Sheet (Apps Script) */
+async function searchRemote(q){
+  const url = SHEET_API + (SHEET_API.includes('?')?'&':'?') + 'action=search&q=' + encodeURIComponent(q) + '&limit=15';
+  const res = await fetch(url);
+  return await res.json();
+}
+/* แสดงผลหลายรายการเป็นการ์ดในบล็อกเดียว */
+function resultsPanel(items){
+  const row = document.createElement('div');
+  row.className = 'panel-row fade';
+  row.innerHTML = items.map(cardHTML).join('<div style="height:10px"></div>');
+  chat.appendChild(row); scrollDown();
+}
+function respond(query){
+  const t = typing();
+  if(!SHEET_API){ setTimeout(()=>{ t.remove(); renderLocal(query); }, 550); return; }
+  searchRemote(query)
+    .catch(()=> searchRemote(query))   // ลองซ้ำ 1 ครั้ง เผื่อช้า/สะดุด
+    .then(res=>{
+      t.remove();
+      if(!res || res.ok===false){ botRow('⚠️ ค้นหาไม่สำเร็จ ลองพิมพ์ใหม่อีกครั้งครับ', true); return; }
+      renderResults(query, res);
+    }).catch(()=>{
+      t.remove();
+      botRow('⚠️ เชื่อมต่อช้าหรือไม่ได้ กรุณาลองพิมพ์ค้นใหม่อีกครั้งครับ', true);
+    });
+}
+/* แสดงผลจากเซิร์ฟเวอร์ */
+function renderResults(query, res){
+  const items = res.items || [];
+  if(!items.length){
+    botRow(`ขออภัยครับ ไม่พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” 😕<br>ลองพิมพ์ชื่อ/รหัสให้สั้นลง หรือใช้คำอื่นดูครับ`, true);
+    return;
+  }
+  const cnt = res.count + (res.count>=15?'+':'');
+  if(res.mode === 'ai'){
+    botRow(`🤖 ผมเข้าใจว่า “<b>${esc(query)}</b>” หมายถึง <b>${esc(res.ai||'')}</b> — พบ <b>${cnt}</b> รายการครับ 👇`, true);
+  } else if(res.mode === 'fuzzy'){
+    botRow(`ไม่พบคำว่า “<b>${esc(query)}</b>” พอดี ๆ ครับ 🤔 คุณหมายถึงกลุ่มนี้ไหม (<b>${cnt}</b> รายการ) 👇`, true);
+  } else {
+    botRow(`พบ <b>${cnt}</b> รายการที่ตรงกับ “<b>${esc(query)}</b>” ครับ 👇`, true);
+  }
+  const showN = Math.min(items.length, 6);
+  resultsPanel(items.slice(0, showN));
+  if(res.count > showN){
+    botRow(`…และอีก <b>${res.count - showN}${res.count>=15?'+':''}</b> รายการ — ถ้ายังไม่เจอที่ต้องการ ลองพิมพ์ให้เจาะจงขึ้นครับ`);
+  }
+}
+/* ค้นหาในข้อมูลตัวอย่าง (เมื่อยังไม่เชื่อมต่อ Sheet) */
+function renderLocal(query){
+  const results = search(query);
+  if(results.length === 0){
+    botRow(`ขออภัยครับ ไม่พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” 😕<br>ลองพิมพ์ใหม่ หรือเลือกจากรายการที่มีในคลังได้เลยครับ`, true);
+    suggestPanel('ตัวอย่างพัสดุในคลัง:', DB.slice(0,6));
+    return;
+  }
+  const top = results[0];
+  if(top.score >= 80){
+    botRow(`พบพัสดุที่ตรงกับ “<b>${esc(query)}</b>” แล้วครับ 👇`, true);
+    botRow(cardHTML(top.it));
+    const others = results.slice(1).filter(r=>r.score>=60).slice(0,3);
+    if(others.length) suggestPanel('🔎 รายการใกล้เคียงอื่น ๆ:', others.map(r=>r.it));
+  } else {
+    botRow(`ไม่พบคำว่า “<b>${esc(query)}</b>” พอดีเป๊ะ ๆ ครับ 🤔<br>คุณหมายถึงรายการนี้หรือเปล่า?`, true);
+    botRow(cardHTML(top.it));
+    const others = results.slice(1).filter(r=>r.score>=35).slice(0,3);
+    if(others.length) suggestPanel('หรืออาจเป็นรายการเหล่านี้:', others.map(r=>r.it));
+  }
+}
+function ask(text){ addUser(text); respond(text); }
+window.ask = ask;
+function submit(){ const v = input.value.trim(); if(!v) return; input.value=''; ask(v); }
+sendBtn.addEventListener('click', submit);
+input.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+/* กันเบราว์เซอร์/ตัวจำรหัส เติมค่า (เช่น admin) ในช่องค้นหา — ล้างตอนโหลดถ้ายังไม่ได้พิมพ์ */
+function clearSearchBox(){ if(document.activeElement !== input) input.value = ''; }
+window.addEventListener('load', ()=>{ clearSearchBox(); setTimeout(clearSearchBox, 200); setTimeout(clearSearchBox, 700); });
+
+/* ================= หน้าต้อนรับ (Splash) ================= */
+const splash = document.getElementById('splash');
+setTimeout(()=> splash.classList.add('hide'), 3000);   // เข้าแอปอัตโนมัติหลัง 3 วินาที
+
+/* ================= โหมดผู้ดูแล (Admin) ================= */
+const pinOverlay = document.getElementById('pinOverlay');
+const pinInput = document.getElementById('pinInput');
+const pinErr = document.getElementById('pinErr');
+const adminPanel = document.getElementById('admin');
+
+document.getElementById('gearBtn').addEventListener('click', ()=>{
+  pinInput.value=''; pinErr.textContent='';
+  pinOverlay.classList.add('show');
+  setTimeout(()=>pinInput.focus(), 100);
+});
+document.getElementById('pinCancel').addEventListener('click', ()=> pinOverlay.classList.remove('show'));
+document.getElementById('pinOk').addEventListener('click', tryPin);
+pinInput.addEventListener('keydown', e=>{ if(e.key==='Enter') tryPin(); });
+pinInput.addEventListener('input', ()=>{ pinErr.textContent=''; if(pinInput.value.length===4) tryPin(); });
+
+function tryPin(){
+  if(pinInput.value === ADMIN_PIN){
+    pinOverlay.classList.remove('show');
+    openAdmin();
+  } else {
+    pinErr.textContent = "รหัส PIN ไม่ถูกต้อง ลองอีกครั้ง";
+    pinInput.value=''; pinInput.focus();
+  }
+}
+document.getElementById('admBack').addEventListener('click', ()=> adminPanel.classList.remove('show'));
+
+let pendingRows = null, pendingName = '';
+function openAdmin(){
+  resetUploadUI();
+  document.getElementById('newPin').value = '';
+  document.getElementById('newPin2').value = '';
+  document.getElementById('pinMsg').textContent = '';
+  adminPanel.classList.add('show');
+}
+/* เปลี่ยนรหัส PIN (เก็บในเครื่อง) */
+document.getElementById('savePin').addEventListener('click', ()=>{
+  const a = document.getElementById('newPin').value.trim();
+  const b = document.getElementById('newPin2').value.trim();
+  const msg = document.getElementById('pinMsg');
+  if(!/^\d{4}$/.test(a)){ msg.style.color = '#dc2626'; msg.textContent = '⚠️ PIN ต้องเป็นตัวเลข 4 หลัก'; return; }
+  if(a !== b){ msg.style.color = '#dc2626'; msg.textContent = '⚠️ ยืนยัน PIN ไม่ตรงกัน ลองใหม่'; return; }
+  ADMIN_PIN = a;
+  localStorage.setItem(PIN_KEY, a);
+  document.getElementById('newPin').value = '';
+  document.getElementById('newPin2').value = '';
+  msg.style.color = '#15803d';
+  msg.textContent = '✅ เปลี่ยน PIN เรียบร้อยแล้ว — ครั้งต่อไปเข้าโหมดผู้ดูแลด้วย PIN ใหม่';
+});
+function resetUploadUI(){
+  pendingRows = null; pendingName = '';
+  document.getElementById('uploadConfirm').style.display = 'none';
+  const log = document.getElementById('importLog');
+  log.className = 'import-log'; log.innerHTML = '';
+}
+function showLog(type, html){
+  const el = document.getElementById('importLog');
+  el.className = 'import-log ' + type;
+  el.innerHTML = html;
+}
+
+/* ----- อัปโหลดไฟล์ (แทนที่ข้อมูลทั้งหมด) ----- */
+const fileInput = document.getElementById('fileInput');
+document.getElementById('uploadZone').addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', handleFile);
+
+function handleFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const name = file.name.toLowerCase();
+  const reader = new FileReader();
+  const done = rows => {
+    if(!rows || !rows.length){ showLog('bad', '❌ ไม่พบข้อมูลในไฟล์'); return; }
+    pendingRows = rows; pendingName = file.name;
+    showConfirm(rows.length);
+  };
+  if(name.endsWith('.csv')){
+    reader.onload = ev => { try { done(parseCSV(ev.target.result)); } catch(err){ showLog('bad', '❌ อ่านไฟล์ CSV ไม่สำเร็จ: ' + err.message); } };
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    if(typeof XLSX === 'undefined'){ showLog('bad', '❌ อ่านไฟล์ Excel ไม่ได้ (ต้องต่ออินเทอร์เน็ตครั้งแรก) — หรือใช้ไฟล์ .csv แทน'); fileInput.value=''; return; }
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        done(XLSX.utils.sheet_to_json(ws, {defval:''}));
+      } catch(err){ showLog('bad', '❌ อ่านไฟล์ Excel ไม่สำเร็จ: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  fileInput.value='';
+}
+
+function showConfirm(count){
+  const log = document.getElementById('importLog'); log.className='import-log'; log.innerHTML='';
+  document.getElementById('confirmInfo').innerHTML =
+    `📄 <b>${esc(pendingName)}</b><br>พบข้อมูล <b>${count.toLocaleString()}</b> แถว<br>` +
+    `<span style="color:#b45309">⚠️ ยืนยันแล้วจะ<b>ลบข้อมูลเดิมทั้งหมด</b> แล้วแทนที่ด้วยไฟล์นี้</span>`;
+  document.getElementById('uploadConfirm').style.display='block';
+}
+
+document.getElementById('confirmUpload').addEventListener('click', ()=>{
+  if(!pendingRows) return;
+  document.getElementById('uploadConfirm').style.display='none';
+  showLog('ok', `🔄 กำลังอัปเดตข้อมูล ${pendingRows.length.toLocaleString()} แถว... กรุณารอสักครู่`);
+  fetch(SHEET_API, {
+    method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action:'replaceAll', token: WRITE_TOKEN, items: pendingRows })
+  }).then(r=>r.json()).then(r=>{
+    if(r && r.ok){ const n=r.count; pendingRows=null; showDone(n); }
+    else showLog('bad', '❌ อัปเดตไม่สำเร็จ: ' + esc((r && r.error) || 'unknown'));
+  }).catch(()=> showLog('bad', '❌ อัปเดตไม่สำเร็จ — ตรวจการเชื่อมต่ออินเทอร์เน็ต'));
+});
+document.getElementById('cancelUpload').addEventListener('click', ()=>{
+  resetUploadUI();
+  showLog('warn', '✖ ยกเลิกการอัปโหลดแล้ว');
+});
+
+/* popup แจ้งเสร็จ → กลับหน้าแรก */
+function showDone(count){
+  document.getElementById('doneMsg').innerHTML = `อัปเดตข้อมูลทั้งหมด <b>${Number(count).toLocaleString()}</b> รายการเรียบร้อยแล้ว`;
+  document.getElementById('donePopup').classList.add('show');
+}
+function goHome(){
+  document.getElementById('donePopup').classList.remove('show');
+  adminPanel.classList.remove('show');
+  resetUploadUI();
+  chat.innerHTML = '';
+  runWelcome();
+}
+document.getElementById('doneOk').addEventListener('click', goHome);
+
+/* CSV parser (รองรับ field ที่มี " ") */
+function parseCSV(text){
+  text = text.replace(/^﻿/, '');
+  const rows = [];
+  let cur = [], val = '', q = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(q){
+      if(c === '"'){ if(text[i+1]==='"'){ val+='"'; i++; } else q=false; }
+      else val += c;
+    } else {
+      if(c === '"') q=true;
+      else if(c === ',') { cur.push(val); val=''; }
+      else if(c === '\n'){ cur.push(val); rows.push(cur); cur=[]; val=''; }
+      else if(c === '\r'){}
+      else val += c;
+    }
+  }
+  if(val.length || cur.length){ cur.push(val); rows.push(cur); }
+  if(!rows.length) return [];
+  const headers = rows[0].map(h=>h.trim());
+  return rows.slice(1).filter(r=>r.some(c=>String(c).trim()!==''))
+    .map(r=>{ const o={}; headers.forEach((h,i)=> o[h]= (r[i]!==undefined? r[i] : '')); return o; });
+}
+
+/* ================= ข้อความต้อนรับ ================= */
+function runWelcome(){
+  botRow(`สวัสดีครับ 👋 ผมคือ <b>ผู้ช่วยคลังพัสดุ</b><br>พิมพ์ <b>ชื่อ</b> หรือ <b>รหัสพัสดุ</b> ที่ต้องการ แล้วผมจะค้นหา <b>รหัสพัสดุ</b> ให้ เพื่อนำไปใช้เบิกต่อได้เลยครับ`, true);
+}
+window.addEventListener('load', ()=> setTimeout(runWelcome, 300));
+
+/* ================= PWA: Service Worker + ปุ่มติดตั้ง ================= */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+let deferredPrompt = null;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault(); deferredPrompt = e;
+  installBtn.style.display = 'grid';
+});
+installBtn.addEventListener('click', async ()=>{
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null; installBtn.style.display = 'none';
+});
+window.addEventListener('appinstalled', ()=> installBtn.style.display = 'none');
+</script>

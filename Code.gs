@@ -404,7 +404,12 @@ var SYN_GROUPS = [
   ['น้ำมันเครื่อง', 'engine oil'],
   ['น้ำมันไฮดรอลิก', 'hydraulic oil'],
   ['สายพานลำเลียง', 'conveyor belt'],
-  ['ตัวกรองอากาศ', 'ไส้กรองอากาศ', 'air filter']
+  ['ตัวกรองอากาศ', 'ไส้กรองอากาศ', 'air filter'],
+  // ---- กระสอบ / ถุงบรรจุ (โรงงานน้ำตาล: ถุงบรรจุน้ำตาลชื่อ "PP Bag ...") ----
+  // *ตั้งใจไม่ใส่คำว่า "ถุง" เดี่ยว ๆ เพื่อไม่ให้ไปชน "ถุงมือ/ถุงเท้า"
+  ['กระสอบ', 'กระสอบน้ำตาล', 'ถุงน้ำตาล', 'ถุงบรรจุ', 'ถุงบรรจุน้ำตาล', 'กระสอบพลาสติก', 'ถุงพลาสติก',
+   'จัมโบ้แบ็ก', 'จัมโบ้', 'บิ๊กแบ็ก', 'ກະສອບ', 'ຖົງນ້ຳຕານ',
+   'bag', 'sack', 'pouch', 'gunny']
 ];
 
 /* ขยายคำค้น → array ของคำ (normalize แล้ว) รวมคำพ้องข้ามภาษา */
@@ -509,6 +514,7 @@ function aiInterpret_(qRaw) {
           'The user query may be in THAI, LAO, or English, and may be vague or misspelled. ' +
           'First understand the real MEANING of the item, then output the ENGLISH keyword(s) most likely to appear in the item name. ' +
           'Lao examples: "ຈາລະບີ"=grease; "ຖ່ານໄຟ"=battery; "ຢາງ"=rubber,tire; "ນ້ຳມັນ"=oil; "ສາຍໄຟ"=wire; "ໝວກ"=helmet; "ຖົງມື"=glove; "ໄຂຄວງ"=screwdriver. ' +
+          'Packaging: "กระสอบ"/"ถุง"/"ຖົງ"/"ກະສອບ"=bag,sack; "กระสอบน้ำตาล"/"ถุงบรรจุน้ำตาล"=sugar bag; "จัมโบ้แบ็ก"/"บิ๊กแบ็ก"=jumbo bag. Sugar packing bags in this factory are named "PP Bag ...". ' +
           'Reply with ONLY 1-5 comma-separated English keywords, no explanation.' },
         { role: 'user', content: String(qRaw) }
       ]

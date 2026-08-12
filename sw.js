@@ -1,5 +1,5 @@
 /* Service Worker — ผู้ช่วยคลังพัสดุ (offline support) */
-const CACHE = 'warehouse-app-v17';
+const CACHE = 'warehouse-app-v18';
 const ASSETS = [
   './',
   './index.html',
@@ -29,6 +29,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   var req = e.request;
+  // ข้ามคำขอข้ามโดเมน (เช่น Google Apps Script) — ปล่อยให้เบราว์เซอร์จัดการเอง ไม่ให้ SW แคช/ทำพัง
+  if (new URL(req.url).origin !== self.location.origin) return;
   var isHTML = req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1;
 
   if (isHTML) {

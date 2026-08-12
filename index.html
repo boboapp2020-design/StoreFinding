@@ -131,6 +131,7 @@
   .card .name { font-weight: 800; font-size: 15px; margin-bottom: 11px; display: flex; align-items: center; gap: 9px; color: var(--ink); }
   .card-ic { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; background: #e5eeff; color: var(--pri); }
   .card-ic svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .card-thumb { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: #e5eeff; border: 1px solid #dbe7ff; cursor: pointer; }
   .code-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .code {
     font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 17px; font-weight: 800; letter-spacing: .5px;
@@ -581,14 +582,26 @@ function stockPill(qty){
   if(qty<=20) return `<span class="stock-pill low">เหลือน้อย (${qty})</span>`;
   return `<span class="stock-pill in">พร้อมเบิก (${qty})</span>`;
 }
+/* แปลงลิงก์ Google Drive ให้แสดงรูปได้ (share link → thumbnail) */
+function fixImg(u){
+  u = String(u||'').trim();
+  if(u.indexOf('drive.google')>=0){
+    const m = u.match(/\/d\/([^\/]+)/) || u.match(/[?&]id=([^&]+)/);
+    if(m) return 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w600';
+  }
+  return u;
+}
 function cardHTML(it){
   const cat = it.cat || it.group || '';
   const catLine = cat ? `<b>หมวดหมู่:</b> ${esc(cat)} &nbsp;·&nbsp; ` : '';
   const locNames = [...new Set((it.locs||[]).map(l=>String(l.name||l.sloc||'').trim()).filter(Boolean))];
   const locLine = locNames.length ? `<br><b>ที่จัดเก็บ:</b> ${esc(locNames.join(', '))}` : '';
   const plantLine = it.plantName ? `<br><b>โรงงาน:</b> ${esc(it.plantName)}` : '';
+  const thumb = it.image
+    ? `<span class="card-ic" style="display:none">${iconFor(it)}</span><img class="card-thumb" src="${esc(fixImg(it.image))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';this.previousElementSibling.style.display='grid'">`
+    : `<span class="card-ic">${iconFor(it)}</span>`;
   return `<div class="card">
-    <div class="name"><span class="card-ic">${iconFor(it)}</span> ${esc(it.name)}</div>
+    <div class="name">${thumb} ${esc(it.name)}</div>
     <div class="code-line">
       <span>รหัสพัสดุ:</span>
       <span class="code">${esc(it.code)}</span>

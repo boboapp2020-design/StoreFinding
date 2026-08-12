@@ -52,7 +52,8 @@ var ALIASES = {
   plant:     ['plant', 'โรงงาน', 'รหัสโรงงาน'],
   plantName: ['name1', 'ชื่อโรงงาน'],
   sloc:      ['storagelocation', 'sloc', 'ที่เก็บ', 'รหัสที่เก็บ'],
-  slocName:  ['descrofstorageloc', 'descriptionofstoragelocation', 'descofstorageloc', 'ที่จัดเก็บ', 'คลัง', 'ชื่อที่เก็บ']
+  slocName:  ['descrofstorageloc', 'descriptionofstoragelocation', 'descofstorageloc', 'ที่จัดเก็บ', 'คลัง', 'ชื่อที่เก็บ'],
+  image:     ['image', 'imageurl', 'รูปภาพ', 'รูป', 'ภาพ', 'photo', 'picture', 'ลิงก์รูป', 'urlรูป', 'รูปสินค้า']
 };
 var REQUIRED = ['code', 'name'];   // ต้องมี ไม่งั้นถือว่าไฟล์ผิดรูปแบบ
 
@@ -138,7 +139,7 @@ function buildCatalog_() {
         code: code, name: col(row, map.name), unit: col(row, map.unit),
         group: col(row, map.group), type: col(row, map.mtype),
         plant: col(row, map.plant), plantName: col(row, map.plantName),
-        qty: 0, locs: []
+        image: col(row, map.image), qty: 0, locs: []
       };
       byCode[code] = it;
     }
@@ -146,6 +147,7 @@ function buildCatalog_() {
     var sloc = col(row, map.sloc), sName = col(row, map.slocName);
     if (sloc || sName) it.locs.push({ sloc: sloc, name: sName, qty: qty });
     if (!it.name) it.name = col(row, map.name);
+    if (!it.image) it.image = col(row, map.image);
   }
 
   var arr = [];
@@ -186,7 +188,7 @@ function loadCatalogCache_(cache) {
 function inflate_(o) {
   return deriveItem_({
     code: o.c, name: o.n, unit: o.u, qty: o.q, group: o.g, type: '',
-    plant: o.p, plantName: o.pn, locs: (o.l || []).map(function (x) { return { name: x }; })
+    plant: o.p, plantName: o.pn, image: o.im || '', locs: (o.l || []).map(function (x) { return { name: x }; })
   });
 }
 function saveCatalogCache_(cache, built) {
@@ -197,7 +199,7 @@ function saveCatalogCache_(cache, built) {
         var nm = String(l.name || l.sloc || '').trim();
         if (nm && !seen[nm] && names.length < 6) { seen[nm] = 1; names.push(nm); }
       });
-      return { c: it.code, n: it.name, u: it.unit, q: it.qty, g: it.group, p: it.plant, pn: it.plantName, l: names };
+      return { c: it.code, n: it.name, u: it.unit, q: it.qty, g: it.group, p: it.plant, pn: it.plantName, im: it.image || '', l: names };
     });
     var json = JSON.stringify(compact);
     var n = Math.ceil(json.length / CAT_CH);
@@ -507,6 +509,7 @@ function pub_(entry) {
   return {
     code: it.code, name: it.name, unit: it.unit, qty: it.qty,
     group: it.group, type: it.type, plant: it.plant, plantName: it.plantName,
+    image: it.image || '',
     locs: (it.locs || []).slice(0, 8)
   };
 }

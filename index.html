@@ -645,9 +645,12 @@ async function apiGet(params, timeoutMs){
     catch(e){ throw new Error('bad-json'); }   // ได้ HTML/ข้อความ ไม่ใช่ JSON → ถือว่าล้มเหลว ให้ลองใหม่
   } finally { clearTimeout(timer); }
 }
-/* ค้นหาผ่าน Google Sheet (Apps Script) */
+/* base64(UTF-8) — ส่งคำค้นแบบ ASCII ล้วน กัน Apps Script อ่านภาษาไทย/ลาวเพี้ยนเป็น "?" */
+function b64utf8(s){ try { return btoa(unescape(encodeURIComponent(String(s)))); } catch(e){ return ''; } }
+/* ค้นหาผ่าน Google Sheet (Apps Script) — ส่งทั้ง q (ปกติ) และ qb64 (กัน charset เพี้ยน) */
 async function searchRemote(q){
-  return apiGet('action=search&q=' + encodeURIComponent(q) + '&limit=15', 30000);
+  return apiGet('action=search&q=' + encodeURIComponent(q) +
+                '&qb64=' + encodeURIComponent(b64utf8(q)) + '&limit=15', 30000);
 }
 /* แสดงผลหลายรายการเป็นการ์ดในบล็อกเดียว */
 function resultsPanel(items){

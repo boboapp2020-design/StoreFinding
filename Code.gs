@@ -622,14 +622,34 @@ function pub_(entry) {
   };
 }
 
+/* อ่านคำค้นให้ทนภาษาไทย/ลาว — Apps Script อ่าน query param non-ASCII เพี้ยนเป็น "?"
+ *   1) qb64 = base64(UTF-8) จากฝั่งแอป (ASCII ล้วน ผ่านได้ทุก charset) ← วิธีหลัก
+ *   2) กู้จาก raw query string (เผื่อ e.parameter เพี้ยน แต่ queryString ยังดิบอยู่)
+ *   3) p.q ปกติ (กรณี ASCII) */
+function readQ_(e, p) {
+  if (p.qb64) {
+    try {
+      var s = Utilities.newBlob(Utilities.base64Decode(String(p.qb64).replace(/ /g, '+'))).getDataAsString('UTF-8');
+      if (s) return s;
+    } catch (x) {}
+  }
+  var qs = e && e.queryString;
+  if (qs) {
+    var m = String(qs).match(/(?:^|&)q=([^&]*)/);
+    if (m) { try { var d = decodeURIComponent(m[1].replace(/\+/g, ' ')); if (d && d.indexOf('�') === -1 && d.indexOf('?') === -1) return d; } catch (x) {} }
+  }
+  return p.q || '';
+}
+
 /* ================= Web App endpoints ================= */
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var action = p.action || 'meta';
   try {
     if (action === 'search') {
-      var res = searchCatalog_(p.q || '', parseInt(p.limit) || DEFAULT_LIMIT);
-      return json_({ ok: true, mode: res.mode, ai: res.ai || '', count: res.items.length, items: res.items, q: p.q || '' });
+      var qq = readQ_(e, p);
+      var res = searchCatalog_(qq, parseInt(p.limit) || DEFAULT_LIMIT);
+      return json_({ ok: true, mode: res.mode, ai: res.ai || '', count: res.items.length, items: res.items, q: qq });
     }
     if (action === 'sample') {
       return json_({ ok: true, items: sample_(parseInt(p.n) || 6) });

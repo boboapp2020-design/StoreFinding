@@ -432,7 +432,7 @@ var SYN_GROUPS = [
   // *ตั้งใจไม่ใส่คำว่า "ถุง" เดี่ยว ๆ เพื่อไม่ให้ไปชน "ถุงมือ/ถุงเท้า"
   ['กระสอบ', 'กระสอบน้ำตาล', 'ถุงน้ำตาล', 'ถุงบรรจุ', 'ถุงบรรจุน้ำตาล', 'กระสอบพลาสติก', 'ถุงพลาสติก',
    'จัมโบ้แบ็ก', 'จัมโบ้', 'บิ๊กแบ็ก', 'ກະສອບ', 'ຖົງນ້ຳຕານ',
-   'bag', 'sack', 'pouch', 'gunny']
+   'bag', 'sack', 'pouch', 'gunny', 'pp']   /* 'pp' = ถุงน้ำตาลชื่อ "PP Bag" (ปุ๋ยไม่มี) → ใช้ดันถุงน้ำตาลขึ้นก่อน */
 ];
 
 /* ขยายคำค้น → array ของคำ (normalize แล้ว) รวมคำพ้องข้ามภาษา */
@@ -463,7 +463,7 @@ function expandQuery_(qRaw) {
 function scoreExact_(cat, variants) {
   var hits = [];
   for (var i = 0; i < cat.length; i++) {
-    var it = cat[i], toks = it._tk || [], sc = 0;
+    var it = cat[i], toks = it._tk || [], sc = 0, mcount = 0;
     for (var v = 0; v < variants.length; v++) {
       var q = variants[v]; if (!q) continue;
       var s = 0;
@@ -477,9 +477,11 @@ function scoreExact_(cat, variants) {
         }
         if (s === 0 && q.length >= 5 && it._nn.indexOf(q) !== -1) s = 74; // คำหลายพยางค์ ยอม substring (safety glasses ฯลฯ)
       }
+      if (s > 0) mcount++;                                     // นับจำนวนคำค้นที่ตรงกับรายการนี้
       if (s > sc) sc = s;
     }
-    if (sc > 0) hits.push([sc, it]);
+    // โบนัสเล็กน้อยเมื่อรายการตรง "หลายคำ" (เช่น PP Bag ตรงทั้ง bag+pp) — คุมไม่ให้ข้ามชั้นคะแนน (สูงสุด 2.4 < 3)
+    if (sc > 0) hits.push([sc + Math.min((mcount - 1) * 0.6, 2.4), it]);
   }
   hits.sort(function (a, b) { return b[0] - a[0]; });
   return hits;

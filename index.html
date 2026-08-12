@@ -634,18 +634,17 @@ function resultsPanel(items){
 }
 function respond(query){
   const t = typing();
-  if(SHEET_API){
-    searchRemote(query).then(res=>{
+  if(!SHEET_API){ setTimeout(()=>{ t.remove(); renderLocal(query); }, 550); return; }
+  searchRemote(query)
+    .catch(()=> searchRemote(query))   // ลองซ้ำ 1 ครั้ง เผื่อช้า/สะดุด
+    .then(res=>{
       t.remove();
-      if(!res || res.ok===false){ botRow('⚠️ ค้นหาไม่สำเร็จ — ตรวจการเชื่อมต่อฐานข้อมูลครับ', true); return; }
+      if(!res || res.ok===false){ botRow('⚠️ ค้นหาไม่สำเร็จ ลองพิมพ์ใหม่อีกครั้งครับ', true); return; }
       renderResults(query, res);
     }).catch(()=>{
       t.remove();
-      botRow('⚠️ เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาลองใหม่อีกครั้งครับ', true);
+      botRow('⚠️ เชื่อมต่อช้าหรือไม่ได้ กรุณาลองพิมพ์ค้นใหม่อีกครั้งครับ', true);
     });
-  } else {
-    setTimeout(()=>{ t.remove(); renderLocal(query); }, 550);
-  }
 }
 /* แสดงผลจากเซิร์ฟเวอร์ */
 function renderResults(query, res){

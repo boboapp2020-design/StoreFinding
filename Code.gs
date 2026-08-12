@@ -105,8 +105,8 @@ function testAI() {
   Logger.log('HTTP ' + res.getResponseCode() + '  |  ' + res.getContentText());
 }
 
-/* ---------- อ่าน + รวมข้อมูล (dedupe by Material, รวม stock หลายที่เก็บ) ---------- */
-function readCatalog_() {
+/* ---------- อ่าน + รวมข้อมูลจากชีต (dedupe by Material, รวม stock หลายที่เก็บ) ---------- */
+function buildCatalog_() {
   var sh = dataSheet_();
   var last = sh.getLastRow(), width = sh.getLastColumn();
   if (last < 2) return { items: [], map: {}, headers: [] };
@@ -149,15 +149,63 @@ function readCatalog_() {
   }
 
   var arr = [];
-  Object.keys(byCode).forEach(function (k) {
-    var it = byCode[k];
-    it._nn = norm_(it.name);
-    it._nc = norm_(it.code);
-    it._tk = String(it.name).split(/[\s,;:\/()\-\.]+/).map(function (t) { return norm_(t); }).filter(Boolean);
-    arr.push(it);
-  });
+  Object.keys(byCode).forEach(function (k) { arr.push(deriveItem_(byCode[k])); });
   return { items: arr, map: map, headers: headers };
 }
+
+/* คำนวณฟิลด์ช่วยค้นหา (ชื่อ/รหัส normalized + tokens) */
+function deriveItem_(it) {
+  it._nn = norm_(it.name);
+  it._nc = norm_(it.code);
+  it._tk = String(it.name).split(/[\s,;:\/()\-\.]+/).map(function (t) { return norm_(t); }).filter(Boolean);
+  return it;
+}
+
+/* ---------- แคชตาราง: อ่านชีตครั้งเดียว เก็บ 6 ชม. เพื่อความเร็ว (มี fallback) ---------- */
+var CAT_TTL = 21600, CAT_CH = 50000;
+function readCatalog_() {
+  var cache = CacheService.getScriptCache();
+  var hit = loadCatalogCache_(cache);
+  if (hit) return hit;
+  var built = buildCatalog_();          // อ่านจากชีต (ช้า) — ทำครั้งเดียว
+  saveCatalogCache_(cache, built);
+  return built;
+}
+function loadCatalogCache_(cache) {
+  try {
+    var metaStr = cache.get('cat:meta'); if (!metaStr) return null;
+    var meta = JSON.parse(metaStr);
+    var keys = []; for (var i = 0; i < meta.n; i++) keys.push('cat:' + i);
+    var parts = cache.getAll(keys);
+    var s = ''; for (var j = 0; j < meta.n; j++) { var p = parts['cat:' + j]; if (p == null) return null; s += p; }
+    var raw = JSON.parse(s), items = [];
+    for (var k = 0; k < raw.length; k++) items.push(inflate_(raw[k]));
+    return { items: items, map: meta.map, headers: meta.headers };
+  } catch (e) { return null; }
+}
+function inflate_(o) {
+  return deriveItem_({
+    code: o.c, name: o.n, unit: o.u, qty: o.q, group: o.g, type: '',
+    plant: o.p, plantName: o.pn, locs: (o.l || []).map(function (x) { return { name: x }; })
+  });
+}
+function saveCatalogCache_(cache, built) {
+  try {
+    var compact = built.items.map(function (it) {
+      var names = [], seen = {};
+      (it.locs || []).forEach(function (l) {
+        var nm = String(l.name || l.sloc || '').trim();
+        if (nm && !seen[nm] && names.length < 6) { seen[nm] = 1; names.push(nm); }
+      });
+      return { c: it.code, n: it.name, u: it.unit, q: it.qty, g: it.group, p: it.plant, pn: it.plantName, l: names };
+    });
+    var json = JSON.stringify(compact);
+    var n = Math.ceil(json.length / CAT_CH);
+    for (var i = 0; i < n; i++) cache.put('cat:' + i, json.substring(i * CAT_CH, (i + 1) * CAT_CH), CAT_TTL);
+    cache.put('cat:meta', JSON.stringify({ n: n, map: built.map, headers: built.headers }), CAT_TTL);
+  } catch (e) {}
+}
+function clearCatalogCache_() { try { CacheService.getScriptCache().remove('cat:meta'); } catch (e) {} }
 
 /* ---------- Levenshtein (สำหรับเดาคำเมื่อพิมพ์ผิด) ---------- */
 function lev_(a, b) {
@@ -574,6 +622,7 @@ function upsert_(items, mode) {
 
   if (map.code != null) sh.getRange(1, map.code + 1, values.length, 1).setNumberFormat('@');   // คอลัมน์รหัสเป็น Text เสมอ
   sh.getRange(1, 1, values.length, width).setValues(values);
+  clearCatalogCache_();   // ข้อมูลเปลี่ยน → ล้างแคชให้อ่านใหม่
   return { ok: true, added: added, updated: updated, count: values.length - 1 };
 }
 
@@ -592,6 +641,7 @@ function replaceAll_(items) {
   sh.getRange(1, 1, Math.max(rows.length, 2), 1).setNumberFormat('@');
   sh.getRange(1, 1, rows.length, HEAD.length).setValues(rows);
   sh.setFrozenRows(1);
+  clearCatalogCache_();   // ข้อมูลเปลี่ยน → ล้างแคชให้อ่านใหม่
   return { ok: true, count: rows.length - 1 };
 }
 

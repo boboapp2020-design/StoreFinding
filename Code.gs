@@ -209,6 +209,83 @@ function saveCatalogCache_(cache, built) {
 }
 function clearCatalogCache_() { try { CacheService.getScriptCache().remove('cat:meta'); } catch (e) {} }
 
+/* ============ จับคู่รูปอัตโนมัติจากโฟลเดอร์ Google Drive ============
+ * แนวคิด: ตั้งชื่อไฟล์รูป = "รหัสสินค้า" (เช่น 100200.jpg) แล้วโยนเข้าโฟลเดอร์เดียว
+ *   ระบบจะอ่านโฟลเดอร์ สร้างตาราง {รหัส → ลิงก์รูป} เก็บแคช 6 ชม.
+ *   เวลาค้นเจอสินค้า ถ้ารหัสตรงกับชื่อไฟล์ → แสดงรูปอัตโนมัติ (ไม่ต้องแก้ชีต)
+ *
+ * ── วิธีตั้งค่า ──
+ *   1) สร้างโฟลเดอร์ใน Google Drive → ตั้งค่าแชร์ "ทุกคนที่มีลิงก์ (ผู้อ่าน)"
+ *   2) เอา Folder ID จาก URL: drive.google.com/drive/folders/<<FOLDER_ID>>
+ *   3) Apps Script → Project Settings → Script Properties → เพิ่ม
+ *        IMAGE_FOLDER_ID = <<FOLDER_ID>>
+ *   4) รันฟังก์ชัน primeImageMap_ 1 ครั้ง (อนุญาตสิทธิ์ Drive) แล้ว Deploy เวอร์ชันใหม่
+ *   * เพิ่ม/เปลี่ยนรูปใหม่ → เมนู "📦 คลังพัสดุ → รีเฟรชรูปจาก Drive" (หรือรอแคชหมดอายุ 6 ชม.) */
+var IMG_TTL = 21600, IMG_CH = 50000;
+var _imgMemo = null;   // memo ภายในรอบรันเดียว (กันอ่านซ้ำ)
+function imageFolderId_() {
+  return String(PropertiesService.getScriptProperties().getProperty('IMAGE_FOLDER_ID') || '').trim();
+}
+function driveThumb_(fileId) { return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w600'; }
+
+/* อ่านโฟลเดอร์ Drive → { รหัส(normalize) : ลิงก์รูป } */
+function buildImageMap_() {
+  var id = imageFolderId_(), map = {};
+  if (!id) return map;
+  try {
+    var files = DriveApp.getFolderById(id).getFiles();
+    while (files.hasNext()) {
+      var f = files.next();
+      var base = String(f.getName()).replace(/\.[^.]+$/, '');   // ตัดนามสกุลไฟล์
+      var key = norm_(base);
+      if (key && !map[key]) map[key] = driveThumb_(f.getId());
+    }
+  } catch (e) {}
+  return map;
+}
+function getImageMap_() {
+  if (_imgMemo) return _imgMemo;
+  var cache = CacheService.getScriptCache();
+  var hit = loadImgCache_(cache);
+  if (hit) { _imgMemo = hit; return hit; }
+  var m = buildImageMap_();
+  saveImgCache_(cache, m);
+  _imgMemo = m;
+  return m;
+}
+function loadImgCache_(cache) {
+  try {
+    var metaStr = cache.get('img:meta'); if (!metaStr) return null;
+    var n = JSON.parse(metaStr).n;
+    var keys = []; for (var i = 0; i < n; i++) keys.push('img:' + i);
+    var parts = cache.getAll(keys), s = '';
+    for (var j = 0; j < n; j++) { var p = parts['img:' + j]; if (p == null) return null; s += p; }
+    return JSON.parse(s);
+  } catch (e) { return null; }
+}
+function saveImgCache_(cache, map) {
+  try {
+    var json = JSON.stringify(map);
+    var n = Math.ceil(json.length / IMG_CH);
+    for (var i = 0; i < n; i++) cache.put('img:' + i, json.substring(i * IMG_CH, (i + 1) * IMG_CH), IMG_TTL);
+    cache.put('img:meta', JSON.stringify({ n: n }), IMG_TTL);
+  } catch (e) {}
+}
+function clearImageCache_() {
+  _imgMemo = null;
+  try { CacheService.getScriptCache().remove('img:meta'); } catch (e) {}
+}
+/* รันจาก Editor 1 ครั้ง เพื่ออนุญาตสิทธิ์ Drive + สร้างแคชรูปล่วงหน้า */
+function primeImageMap_() {
+  clearImageCache_();
+  var m = buildImageMap_();
+  saveImgCache_(CacheService.getScriptCache(), m);
+  var cnt = 0; for (var k in m) cnt++;
+  Logger.log('IMAGE_FOLDER_ID=' + imageFolderId_() + '  |  จับคู่รูปได้ ' + cnt + ' ไฟล์');
+  return cnt;
+}
+function primeImageMap() { return primeImageMap_(); }   // alias ให้กดรันจากเมนู Editor ง่าย
+
 /* ---------- Levenshtein (สำหรับเดาคำเมื่อพิมพ์ผิด) ---------- */
 function lev_(a, b) {
   var m = a.length, n = b.length;
@@ -506,10 +583,12 @@ function sample_(n) {
 
 function pub_(entry) {
   var it = entry[1] || entry;   // รองรับทั้ง [score,item] และ item
+  var img = it.image || '';
+  if (!img) { var m = getImageMap_(); img = m[norm_(it.code)] || ''; }   // ไม่มีลิงก์ในชีต → หาจากโฟลเดอร์ Drive ตามชื่อไฟล์=รหัส
   return {
     code: it.code, name: it.name, unit: it.unit, qty: it.qty,
     group: it.group, type: it.type, plant: it.plant, plantName: it.plantName,
-    image: it.image || '',
+    image: img,
     locs: (it.locs || []).slice(0, 8)
   };
 }
@@ -525,6 +604,13 @@ function doGet(e) {
     }
     if (action === 'sample') {
       return json_({ ok: true, items: sample_(parseInt(p.n) || 6) });
+    }
+    if (action === 'imgdiag') {
+      var fid = imageFolderId_();
+      if (!fid) return json_({ ok: true, folderId: '', count: 0, note: 'ยังไม่ได้ตั้งค่า IMAGE_FOLDER_ID ใน Script Properties' });
+      var im = getImageMap_(), c = 0, sample = [];
+      for (var kk in im) { c++; if (sample.length < 5) sample.push(kk); }
+      return json_({ ok: true, folderId: fid, count: c, sampleCodes: sample });
     }
     if (action === 'aidiag') {
       var pr = PropertiesService.getScriptProperties();
@@ -654,7 +740,22 @@ function onOpen() {
     .addItem('ตรวจสอบคอลัมน์ที่ตรวจจับได้', 'checkColumns')
     .addItem('นับจำนวนรายการ (unique Material)', 'countItems')
     .addItem('ซ่อมรหัสให้แสดงเลขเต็ม (แก้ 1.01E+15)', 'fixCodeColumn')
+    .addSeparator()
+    .addItem('🖼️ รีเฟรชรูปจาก Drive (หลังเพิ่มรูปใหม่)', 'refreshImages')
     .addToUi();
+}
+
+/* ล้างแคชรูป + อ่านโฟลเดอร์ใหม่ แล้วรายงานจำนวนที่จับคู่ได้ */
+function refreshImages() {
+  var ui = SpreadsheetApp.getUi();
+  var id = imageFolderId_();
+  if (!id) { ui.alert('ยังไม่ได้ตั้งค่า IMAGE_FOLDER_ID\n\nไปที่ Apps Script → Project Settings → Script Properties\nแล้วเพิ่ม  IMAGE_FOLDER_ID = <Folder ID ของโฟลเดอร์รูป>'); return; }
+  try {
+    var cnt = primeImageMap_();
+    ui.alert('รีเฟรชรูปเรียบร้อย ✅\nจับคู่รูปจากโฟลเดอร์ได้ ' + cnt + ' ไฟล์\n\n(ระบบจับคู่ด้วย "ชื่อไฟล์ = รหัสสินค้า")');
+  } catch (err) {
+    ui.alert('อ่านโฟลเดอร์ไม่สำเร็จ: ' + err.message + '\n\nตรวจว่า Folder ID ถูกต้อง และรันฟังก์ชัน primeImageMap_ อนุญาตสิทธิ์ Drive แล้ว');
+  }
 }
 
 /* ซ่อมคอลัมน์รหัส: แปลงตัวเลขที่ถูกย่อ (1.01E+15) กลับเป็นข้อความเลขเต็มทุกหลัก */

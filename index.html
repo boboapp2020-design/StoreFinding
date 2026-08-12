@@ -749,11 +749,30 @@ function runManualSearch(q){
   attempt(3).then(res=>{
     if(my !== mSeq) return;   // มีการพิมพ์ใหม่แล้ว ทิ้งผลเก่า
     mItems = (res && res.items) ? res.items : [];
+    setMFilter('all');        // ค้นใหม่ทุกครั้ง → รีเซ็ตกลับ "ทั้งหมด" กันตัวกรองค้างบังผล
     renderMResults();
   }).catch(()=>{ if(my===mSeq) mResults.innerHTML = '<div class="search-hint">⚠️ เชื่อมต่อช้าหรือไม่ได้<br>ลองพิมพ์ใหม่อีกครั้งครับ</div>'; });
 }
 
+/* ตั้งตัวกรองที่เลือก + ไฮไลต์ปุ่มให้ตรง */
+function setMFilter(f){
+  mFilter = f;
+  document.querySelectorAll('#searchOverlay .fchip').forEach(c=> c.classList.toggle('on', c.dataset.f === f));
+}
+/* อัปเดตจำนวนบนปุ่มกรอง เช่น "พร้อมเบิก (0)" — เห็นทันทีว่าอันไหนมีของ */
+const F_LABEL = { all:'ทั้งหมด', in:'พร้อมเบิก', low:'เหลือน้อย', out:'หมดสต็อก' };
+function updateFilterChips(){
+  const show = mSearchInp.value.trim() && mItems.length;
+  const counts = { all: mItems.length, in:0, low:0, out:0 };
+  mItems.forEach(it=>{ counts[stockBucket(it.qty)]++; });
+  document.querySelectorAll('#searchOverlay .fchip').forEach(c=>{
+    const f = c.dataset.f;
+    c.textContent = show ? (F_LABEL[f] + ' (' + counts[f] + ')') : F_LABEL[f];
+  });
+}
+
 function renderMResults(){
+  updateFilterChips();
   const typed = mSearchInp.value.trim();
   if(!typed){ mResults.innerHTML = '<div class="search-hint">🔍 พิมพ์ชื่อ หรือ รหัสพัสดุ เพื่อค้นหา<br>แล้วเลือกตัวกรองสถานะสต็อกได้</div>'; return; }
   let list = mItems;

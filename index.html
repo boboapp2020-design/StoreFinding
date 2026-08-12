@@ -56,11 +56,34 @@
   @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)} 70%{box-shadow:0 0 0 6px rgba(34,197,94,0)} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0)} }
   .h-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
   .ai-chip {
-    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; border: none; cursor: pointer;
     background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; font-weight: 800; font-size: 15px;
-    display: grid; place-items: center; letter-spacing: .5px;
+    display: grid; place-items: center; letter-spacing: .5px; font-family: inherit; transition: transform .15s;
     box-shadow: 0 0 16px rgba(59,130,246,.6), inset 0 0 0 2px rgba(255,255,255,.3);
   }
+  .ai-chip:active { transform: scale(.9); }
+  .ai-chip svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- โหมดค้นหาเอง (manual search) ---------- */
+  .search-sheet {
+    background: #fff; border-radius: 20px; width: 100%; max-width: 440px;
+    height: 86%; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(18,52,107,.35); animation: pop .25s ease;
+  }
+  .search-top { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .search-top h3 { font-size: 16px; font-weight: 800; color: var(--ink); flex: 1; display: flex; align-items: center; gap: 8px; margin: 0; }
+  .search-close { width: 32px; height: 32px; border-radius: 10px; border: none; background: #eef2f9; color: var(--text); font-size: 17px; cursor: pointer; flex-shrink: 0; font-family: inherit; }
+  .search-close:active { transform: scale(.9); }
+  .search-inp-wrap { padding: 12px 16px 6px; }
+  .search-inp { width: 100%; border: 2px solid var(--line); border-radius: 12px; padding: 11px 14px; font-size: 15px; outline: none; font-family: inherit; box-sizing: border-box; }
+  .search-inp:focus { border-color: var(--pri); }
+  .filter-row { display: flex; gap: 8px; padding: 6px 16px 12px; overflow-x: auto; }
+  .fchip { flex-shrink: 0; border: 1px solid var(--line); background: #fff; color: var(--text); border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; transition: .12s; }
+  .fchip.on { background: var(--pri); color: #fff; border-color: var(--pri); }
+  .fchip:active { transform: scale(.94); }
+  .search-results { flex: 1; overflow-y: auto; padding: 4px 16px 16px; -webkit-overflow-scrolling: touch; }
+  .search-results .card { margin-bottom: 10px; }
+  .search-hint { text-align: center; color: var(--muted); font-size: 13px; padding: 28px 12px; line-height: 1.7; }
   .hbtn {
     width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
     background: rgba(255,255,255,.7); border: 1px solid rgba(120,170,255,.55); color: var(--pri-d);
@@ -292,7 +315,9 @@
     <div class="h-sub"><span class="dot"></span> ออนไลน์ · ค้นหารหัสพัสดุ</div>
   </div>
   <div class="h-right">
-    <div class="ai-chip">AI</div>
+    <button class="ai-chip" id="searchBtn" title="ค้นหาพัสดุเอง">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    </button>
     <button class="hbtn" id="installBtn" title="ติดตั้งแอป" style="display:none">⬇️</button>
     <button class="hbtn" id="gearBtn" title="โหมดผู้ดูแล">⚙️</button>
   </div>
@@ -324,6 +349,28 @@
       <button class="btn btn-ghost" id="pinCancel">ยกเลิก</button>
       <button class="btn btn-primary" id="pinOk">เข้าสู่ระบบ</button>
     </div>
+  </div>
+</div>
+
+<!-- โหมดค้นหาเอง (manual search + filter) -->
+<div class="overlay" id="searchOverlay">
+  <div class="search-sheet">
+    <div class="search-top">
+      <h3><svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--pri);fill:none;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg> ค้นหาพัสดุ</h3>
+      <button class="search-close" id="mSearchClose" title="ปิด">✕</button>
+    </div>
+    <div class="search-inp-wrap">
+      <input class="search-inp" id="mSearchInp" type="search" placeholder="พิมพ์ชื่อ หรือ รหัสพัสดุ..."
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+             name="m_search_nofill" data-lpignore="true" data-1p-ignore data-form-type="other" />
+    </div>
+    <div class="filter-row">
+      <button class="fchip on" data-f="all">ทั้งหมด</button>
+      <button class="fchip" data-f="in">พร้อมเบิก</button>
+      <button class="fchip" data-f="low">เหลือน้อย</button>
+      <button class="fchip" data-f="out">หมดสต็อก</button>
+    </div>
+    <div class="search-results" id="mResults"></div>
   </div>
 </div>
 
@@ -659,6 +706,67 @@ function resultsPanel(items){
   row.innerHTML = items.map(cardHTML).join('<div style="height:10px"></div>');
   chat.appendChild(row); scrollDown();
 }
+/* ============ โหมดค้นหาเอง (manual search + filter) ============ */
+const searchOverlay = document.getElementById('searchOverlay');
+const mSearchInp = document.getElementById('mSearchInp');
+const mResults = document.getElementById('mResults');
+let mItems = [];          // ผลค้นล่าสุด (จากเซิร์ฟเวอร์)
+let mFilter = 'all';      // ตัวกรองสต็อกที่เลือก
+let mDebounce = null, mSeq = 0;
+
+document.getElementById('searchBtn').addEventListener('click', ()=>{
+  searchOverlay.classList.add('show');
+  renderMResults();
+  setTimeout(()=>mSearchInp.focus(), 120);
+});
+function closeMSearch(){ searchOverlay.classList.remove('show'); }
+document.getElementById('mSearchClose').addEventListener('click', closeMSearch);
+searchOverlay.addEventListener('click', e=>{ if(e.target===searchOverlay) closeMSearch(); });
+
+/* จัดกลุ่มสต็อกให้ตรงกับ stockPill: หมด / เหลือน้อย(<=20) / พร้อมเบิก */
+function stockBucket(qty){ const q = +qty||0; if(q<=0) return 'out'; if(q<=20) return 'low'; return 'in'; }
+
+document.querySelectorAll('#searchOverlay .fchip').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#searchOverlay .fchip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on'); mFilter = c.dataset.f; renderMResults();
+  });
+});
+
+mSearchInp.addEventListener('input', ()=>{
+  clearTimeout(mDebounce);
+  const q = mSearchInp.value.trim();
+  if(!q){ mItems = []; renderMResults(); return; }
+  mResults.innerHTML = '<div class="search-hint">🔎 กำลังค้นหา…</div>';
+  mDebounce = setTimeout(()=>runManualSearch(q), 350);   // หน่วง 0.35 วิ กันยิงถี่
+});
+
+function runManualSearch(q){
+  const my = ++mSeq;
+  const attempt = (n)=> apiGet('action=search&q=' + encodeURIComponent(q) +
+      '&qb64=' + encodeURIComponent(b64utf8(q)) + '&limit=30', 30000)
+    .catch(err=>{ if(n<=1) throw err; return new Promise(r=>setTimeout(r,800)).then(()=>attempt(n-1)); });
+  attempt(3).then(res=>{
+    if(my !== mSeq) return;   // มีการพิมพ์ใหม่แล้ว ทิ้งผลเก่า
+    mItems = (res && res.items) ? res.items : [];
+    renderMResults();
+  }).catch(()=>{ if(my===mSeq) mResults.innerHTML = '<div class="search-hint">⚠️ เชื่อมต่อช้าหรือไม่ได้<br>ลองพิมพ์ใหม่อีกครั้งครับ</div>'; });
+}
+
+function renderMResults(){
+  const typed = mSearchInp.value.trim();
+  if(!typed){ mResults.innerHTML = '<div class="search-hint">🔍 พิมพ์ชื่อ หรือ รหัสพัสดุ เพื่อค้นหา<br>แล้วเลือกตัวกรองสถานะสต็อกได้</div>'; return; }
+  let list = mItems;
+  if(mFilter !== 'all') list = list.filter(it=> stockBucket(it.qty) === mFilter);
+  if(!list.length){
+    mResults.innerHTML = mItems.length
+      ? '<div class="search-hint">ไม่มีรายการที่ตรงกับตัวกรองนี้<br>ลองเลือก “ทั้งหมด” ดูครับ</div>'
+      : '<div class="search-hint">ไม่พบพัสดุที่ตรงกับคำค้นนี้ 😕<br>ลองใช้คำอื่น หรือพิมพ์สั้นลงครับ</div>';
+    return;
+  }
+  mResults.innerHTML = list.map(cardHTML).join('');
+}
+
 function respond(query){
   const t = typing();
   if(!SHEET_API){ setTimeout(()=>{ t.remove(); renderLocal(query); }, 550); return; }

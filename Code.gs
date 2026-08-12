@@ -237,8 +237,16 @@ function buildImageMap_() {
     while (files.hasNext()) {
       var f = files.next();
       var base = String(f.getName()).replace(/\.[^.]+$/, '');   // ตัดนามสกุลไฟล์
-      var key = norm_(base);
-      if (key && !map[key]) map[key] = driveThumb_(f.getId());
+      var url = driveThumb_(f.getId());
+      var full = norm_(base);
+      if (full && !map[full]) map[full] = url;                  // คีย์เต็ม (กรณีตั้งชื่อไฟล์ = รหัสตรง ๆ)
+      // เผื่อชื่อไฟล์มี "ชื่อสินค้า + รหัส" ปนกัน → ดึงเลขรหัสที่ยาวที่สุด (>=6 หลัก) มาเป็นคีย์ด้วย
+      var runs = base.match(/\d{6,}/g);
+      if (runs) {
+        var longest = '';
+        for (var i = 0; i < runs.length; i++) if (runs[i].length > longest.length) longest = runs[i];
+        if (longest && !map[longest]) map[longest] = url;
+      }
     }
   } catch (e) {}
   return map;
@@ -252,6 +260,21 @@ function getImageMap_() {
   saveImgCache_(cache, m);
   _imgMemo = m;
   return m;
+}
+/* หา URL รูปของรหัสสินค้า — จับคู่ตรงตัวก่อน ถ้าไม่เจอลองแบบ "ขึ้นต้นตรงกัน"
+ * (เผื่อชื่อไฟล์มีเลขเกิน/ขาดท้ายรหัส เช่น รหัส 1511150501004803 แต่ไฟล์ตั้งชื่อ ...048030) */
+function findImage_(code) {
+  var m = getImageMap_(), c = norm_(code);
+  if (!c) return '';
+  if (m[c]) return m[c];                       // ตรงตัว
+  if (c.length >= 8) {                          // ยืดหยุ่น (ต้องยาวพอ กันจับผิด)
+    var keys = Object.keys(m);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.length >= 8 && (k.indexOf(c) === 0 || c.indexOf(k) === 0)) return m[k];
+    }
+  }
+  return '';
 }
 function loadImgCache_(cache) {
   try {
@@ -590,7 +613,7 @@ function sample_(n) {
 function pub_(entry) {
   var it = entry[1] || entry;   // รองรับทั้ง [score,item] และ item
   var img = it.image || '';
-  if (!img) { var m = getImageMap_(); img = m[norm_(it.code)] || ''; }   // ไม่มีลิงก์ในชีต → หาจากโฟลเดอร์ Drive ตามชื่อไฟล์=รหัส
+  if (!img) img = findImage_(it.code);   // ไม่มีลิงก์ในชีต → หาจากโฟลเดอร์ Drive (ชื่อไฟล์=รหัส แบบยืดหยุ่น)
   return {
     code: it.code, name: it.name, unit: it.unit, qty: it.qty,
     group: it.group, type: it.type, plant: it.plant, plantName: it.plantName,

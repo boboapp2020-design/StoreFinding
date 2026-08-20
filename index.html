@@ -774,16 +774,139 @@ function hydrateCatalog(items){
   }));
 }
 /* กรองทันทีในเครื่อง: ทุกคำที่พิมพ์ต้องอยู่ในข้อความค้นหา (พิมพ์เพิ่ม = แคบลงเรื่อย ๆ) */
+/* พจนานุกรมคำพ้อง ไทย/ลาว↔อังกฤษ (คัดจาก Code.gs) — ให้โหมดค้นเองเข้าใจคำไทยด้วย */
+const SYN_GROUPS = [
+  ['ปากกา','ปากกาลูกลื่น','ບິກ','ປາກກາ','pen','ballpoint'],
+  ['ดินสอ','ສໍ','pencil'],
+  ['กระดาษ','ເຈ້ຍ','paper'],
+  ['สายไฟ','สายเคเบิล','ສາຍໄຟ','wire','cable'],
+  ['น็อต','นอต','สกรู','ນັອດ','bolt','nut','screw'],
+  ['ถุงมือ','ຖົງມື','glove','gloves'],
+  ['หมวก','หมวกนิรภัย','ໝວກ','helmet'],
+  ['หลอดไฟ','หลอด','ຫລອດໄຟ','bulb','lamp','led'],
+  ['เทป','ເທບ','tape'],
+  ['น้ำมัน','ນ້ຳມັນ','oil','lubricant'],
+  ['จารบี','ຈາລະບີ','grease'],
+  ['แบตเตอรี่','ถ่าน','ถ่านไฟ','ຖ່ານ','ຖ່ານໄຟ','ໝໍ້ໄຟ','battery'],
+  ['มอเตอร์','ມໍເຕີ','motor'],
+  ['ปั๊ม','ปั้ม','ປໍ້າ','pump'],
+  ['ท่อ','ທໍ່','pipe','tube'],
+  ['วาล์ว','ประตูน้ำ','ວາລ໌','valve'],
+  ['ลูกปืน','ตลับลูกปืน','ໝາກປືນ','bearing'],
+  ['สวิตช์','ສະວິດ','switch'],
+  ['เบรก','ເບຣກ','brake'],
+  ['กรอง','ไส้กรอง','ໄສ້ກອງ','filter'],
+  ['แหวน','ແຫວນ','washer'],
+  ['ประเก็น','ปะเก็น','ปะกำ','gasket'],
+  ['ข้อต่อ','ข้องอ','ຂໍ້ຕໍ່','elbow','joint','coupling','fitting'],
+  ['สายพาน','ສາຍພານ','belt'],
+  ['โซ่','ໂສ້','chain'],
+  ['พัดลม','ພັດລົມ','fan'],
+  ['ฟิวส์','ຟິວ','fuse'],
+  ['รีเลย์','relay'],
+  ['เซนเซอร์','sensor'],
+  ['เกจ','เกจวัด','gauge'],
+  ['ประแจ','ປະແຈ','wrench','spanner'],
+  ['ค้อน','ຄ້ອນ','hammer'],
+  ['ไขควง','ໄຂຄວງ','screwdriver'],
+  ['คีม','ຄີມ','plier','pliers'],
+  ['เลื่อย','ເລື່ອຍ','saw'],
+  ['สว่าน','ສະຫວ່ານ','drill'],
+  ['ตะปู','ຕະປູ','nail'],
+  ['กาว','ກາວ','glue','adhesive'],
+  ['แปรง','ແປງ','brush'],
+  ['เชือก','ເຊືອກ','rope'],
+  ['ยาง','ຢາງ','tire','tyre','rubber'],
+  ['ลูกสูบ','piston'],
+  ['เพลา','shaft'],
+  ['เฟือง','ເຟືອງ','gear'],
+  ['หัวฉีด','nozzle','injector'],
+  ['ถัง','ຖັງ','tank','drum'],
+  ['ฝา','cover','cap','lid'],
+  ['ยางลบ','eraser'],
+  ['ไม้บรรทัด','ruler'],
+  ['กรรไกร','scissors'],
+  ['ที่เย็บกระดาษ','แม็ก','stapler'],
+  ['ลวดเย็บ','staple'],
+  ['แฟ้ม','folder','file'],
+  ['ซองจดหมาย','envelope'],
+  ['หมึก','ink'],
+  ['ตลับหมึก','cartridge','toner'],
+  ['แว่นตานิรภัย','แว่นตา','goggles','safety glasses','glasses','goggle'],
+  ['รองเท้าเซฟตี้','รองเท้า','รองเท้านิรภัย','บู๊ท','บูท','safety shoes','shoe','shoes','boot','boots'],
+  ['หน้ากาก','mask','respirator'],
+  ['ที่อุดหู','ปลั๊กอุดหู','ear plug','earplug'],
+  ['เสื้อสะท้อนแสง','safety vest'],
+  ['สายยาง','hose'],
+  ['หน้าแปลน','flange'],
+  ['ซีล','seal'],
+  ['โอริง','oring','o-ring'],
+  ['ลูกลอย','float'],
+  ['โซลินอยด์','solenoid'],
+  ['คอนแทคเตอร์','contactor'],
+  ['เบรกเกอร์','breaker'],
+  ['คาปาซิเตอร์','คาปา','capacitor'],
+  ['สตาร์ทเตอร์','starter'],
+  ['เทอร์มินอล','terminal'],
+  ['ปลั๊กไฟ','ปลั๊ก','plug'],
+  ['เต้ารับ','socket','receptacle'],
+  ['ตะแกรง','screen','mesh'],
+  ['มู่เล่ย์','มูเล่','pulley'],
+  ['สปริง','spring'],
+  ['ลวด','wire'],
+  ['แผ่นเหล็ก','steel plate','sheet'],
+  ['กระบอกลม','ลูกสูบลม','air cylinder','pneumatic'],
+  ['เกจวัดแรงดัน','เกจวัด','pressure gauge'],
+  ['เทอร์โมมิเตอร์','thermometer'],
+  ['ปั๊มน้ำ','water pump'],
+  ['ใบพัด','impeller'],
+  ['ฮีตเตอร์','heater'],
+  ['ผ้าเบรก','brake pad','brake lining'],
+  ['ลูกหมาก','ball joint'],
+  ['ซีลกันน้ำมัน','oil seal'],
+  ['บูช','bush','bushing'],
+  ['ปลอก','sleeve'],
+  ['หมุด','rivet'],
+  ['กิ๊บ','clip'],
+  ['เข็มขัดรัดท่อ','แคลมป์','clamp'],
+  ['น้ำมันเครื่อง','engine oil'],
+  ['น้ำมันไฮดรอลิก','hydraulic oil'],
+  ['สายพานลำเลียง','conveyor belt'],
+  ['ตัวกรองอากาศ','ไส้กรองอากาศ','air filter'],
+  ['กระสอบ','กระสอบน้ำตาล','ถุงน้ำตาล','ถุงบรรจุ','ถุงบรรจุน้ำตาล','กระสอบพลาสติก','ถุงพลาสติก','จัมโบ้แบ็ก','จัมโบ้','บิ๊กแบ็ก','ກະສອບ','ຖົງນ້ຳຕານ','bag','sack','pouch','gunny','pp']
+];
+/* เตรียมกลุ่มคำแบบ normalize ไว้ล่วงหน้า (เร็วขึ้น) */
+const SYN_NORM = SYN_GROUPS.map(g=> g.map(normS).filter(Boolean));
+/* ขยาย 1 คำ → คำพ้องทั้งหมด (ไทย/ลาว/อังกฤษ) */
+function expandWord(w){
+  const set = [w];
+  for(let i=0;i<SYN_NORM.length;i++){
+    const g = SYN_NORM[i]; let hit=false;
+    for(let j=0;j<g.length;j++){
+      const nt=g[j];
+      if(nt===w){ hit=true; break; }
+      if(w.length>=3 && Math.abs(nt.length-w.length)<=3 && (nt.indexOf(w)!==-1 || w.indexOf(nt)!==-1)){ hit=true; break; }
+    }
+    if(hit) for(let j=0;j<g.length;j++) set.push(g[j]);
+  }
+  return set;
+}
+
 function filterAll(q){
   const qn = normS(q);
-  const words = q.trim().split(/\s+/).map(normS).filter(Boolean);
-  if(!words.length) return [];
-  const codeMode = qn.length >= 4;   // พิมพ์รหัส (ยาว ≥4) → จับที่รหัสด้วย
+  const rawWords = q.trim().split(/\s+/).map(normS).filter(Boolean);
+  if(!rawWords.length) return [];
+  const wordSets = rawWords.map(expandWord);   // แต่ละคำ → ชุดคำพ้อง
+  const codeMode = qn.length >= 4;             // พิมพ์รหัส (ยาว ≥4) → จับที่รหัสด้วย
   const out = [];
   for(let i=0;i<allCatalog.length;i++){
     const it = allCatalog[i];
     let nameOk = true;
-    for(let w=0;w<words.length;w++){ if(it._name.indexOf(words[w])===-1){ nameOk=false; break; } }
+    for(let s=0;s<wordSets.length;s++){        // ทุกคำต้องเจอ (คำใดคำหนึ่งในชุดคำพ้องก็พอ)
+      const alts = wordSets[s]; let any=false;
+      for(let a=0;a<alts.length;a++){ if(it._name.indexOf(alts[a])!==-1){ any=true; break; } }
+      if(!any){ nameOk=false; break; }
+    }
     if(nameOk || (codeMode && it._code.indexOf(qn)!==-1)) out.push(it);
   }
   return out;

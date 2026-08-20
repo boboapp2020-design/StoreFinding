@@ -439,6 +439,8 @@ var SYN_GROUPS = [
 function expandQuery_(qRaw) {
   var nq = norm_(qRaw), nql = normLoose_(qRaw);
   var set = {}; set[nq] = true;
+  var exactHit = false;
+  // รอบ 1: คำตรง/เป็นส่วนหนึ่งของกัน (ความมั่นใจสูง)
   for (var g = 0; g < SYN_GROUPS.length; g++) {
     var grp = SYN_GROUPS[g], hit = false;
     for (var t = 0; t < grp.length; t++) {
@@ -447,14 +449,24 @@ function expandQuery_(qRaw) {
       // เป็นส่วนหนึ่งของกัน แต่ความยาวต่างกันไม่เกิน 3 (กัน "เบรกเกอร์" ไปจับ "เบรก")
       if (nq.length >= 3 && Math.abs(nt.length - nq.length) <= 3 &&
           (nt.indexOf(nq) !== -1 || nq.indexOf(nt) !== -1)) { hit = true; break; }
-      // เดาคำพิมพ์ผิดของคำในพจนานุกรม (ไม่สนวรรณยุกต์) เช่น "ปากา"→ปากกา, "นอต"→น็อต
-      var ntl = stripTones_(nt);
-      if (nql.length >= 3 && Math.abs(ntl.length - nql.length) <= 2) {
-        var sim = 1 - lev_(nql, ntl) / Math.max(nql.length, ntl.length);
-        if (sim >= 0.72) { hit = true; break; }
-      }
     }
-    if (hit) for (var k = 0; k < grp.length; k++) { var v = norm_(grp[k]); if (v) set[v] = true; }
+    if (hit) { exactHit = true; for (var k = 0; k < grp.length; k++) { var v = norm_(grp[k]); if (v) set[v] = true; } }
+  }
+  // รอบ 2: เดาคำพิมพ์ผิด (ไม่สนวรรณยุกต์) เช่น "ปากา"→ปากกา — ทำเฉพาะตอน "ไม่เจอคำตรง"
+  //         กันคำที่บังเอิญคล้ายกันมาปน (เช่น "เกิบ"=รองเท้า ไม่ให้ไปจับ "กิ๊บ"=clip)
+  if (!exactHit) {
+    for (var g2 = 0; g2 < SYN_GROUPS.length; g2++) {
+      var grp2 = SYN_GROUPS[g2], hit2 = false;
+      for (var t2 = 0; t2 < grp2.length; t2++) {
+        var nt2 = norm_(grp2[t2]); if (!nt2) continue;
+        var ntl = stripTones_(nt2);
+        if (nql.length >= 3 && Math.abs(ntl.length - nql.length) <= 2) {
+          var sim = 1 - lev_(nql, ntl) / Math.max(nql.length, ntl.length);
+          if (sim >= 0.72) { hit2 = true; break; }
+        }
+      }
+      if (hit2) for (var k2 = 0; k2 < grp2.length; k2++) { var v2 = norm_(grp2[k2]); if (v2) set[v2] = true; }
+    }
   }
   return Object.keys(set);
 }
